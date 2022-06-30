@@ -21,18 +21,19 @@ import io.ktor.websocket.*
 import org.slf4j.event.Level
 
 // Globals
-val server = DrawingServer()
+val server = DrawingServer() // represent the database
 
 fun main(args: Array<String>): Unit =
     io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused") // application.conf references the main function. This annotation prevents the IDE from marking it as unused.
 fun Application.module() {
+
     install(Sessions) {
         cookie<DrawingSession>("SESSION")
     }
 
-    // Setup the sessions
+    // Set up the sessions
     intercept(ApplicationCallPipeline.Features) {
         call.sessions.get<DrawingSession>() ?: run {
             val clientId = call.parameters["clientId"] ?: "" // throw IllegalArgumentException("clientId is required")
