@@ -4,13 +4,12 @@ import com.google.gson.JsonParser
 import com.realityexpander.common.Constants.TYPE_ANNOUNCEMENT
 import com.realityexpander.common.Constants.TYPE_CHAT_MESSAGE
 import com.realityexpander.common.Constants.TYPE_DRAW_DATA
+import com.realityexpander.common.Constants.TYPE_JOIN_ROOM_HANDSHAKE
+import com.realityexpander.data.Player
 import com.realityexpander.data.Room
-import com.realityexpander.data.models.socket.Announcement
-import com.realityexpander.data.models.socket.BaseModel
-import com.realityexpander.data.models.socket.ChatMessage
-import com.realityexpander.data.models.socket.DrawData
+import com.realityexpander.data.models.socket.*
 import com.realityexpander.gson
-import com.realityexpander.server
+import com.realityexpander.serverDB
 import com.realityexpander.session.DrawingSession
 import io.ktor.http.cio.websocket.*
 import io.ktor.routing.*
@@ -22,8 +21,30 @@ fun Route.gameWebSocketRoute() {
     route("/ws/draw") {
         standardWebSocket { socket, clientId, messageJson, payload ->
             when(payload) {
+                is JoinRoomHandshake -> {
+                    val room = serverDB.rooms[payload.roomName]
+
+                    if (room == null) {
+                        val gameError = GameError(GameError.ERROR_TYPE_ROOM_NOT_FOUND)
+                        socket.send(Frame.Text(gson.toJson(gameError))) // send error message to specific user who tried to join
+                        return@standardWebSocket
+                    }
+
+                    // Create the new player
+                    val newPlayer = Player(
+                        payload.playerName,
+                        socket,
+                        payload.clientId
+                    )
+
+                    // Add player to room
+                    serverDB.playerJoined(newPlayer)
+                    if(!room.containsPlayer(newPlayer.playerName)) {
+                        room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
+                    }
+                }
                 is DrawData -> {
-                    val room = server.rooms[payload.roomName] ?: return@standardWebSocket
+                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
 
                     if(room.phase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExcept(messageJson, clientId)
@@ -65,8 +86,9 @@ fun Route.standardWebSocket(
                     // Get the type of message
                     val type = when(jsonObject.get("type").asString) {
                             TYPE_CHAT_MESSAGE -> ChatMessage::class.java
-                            TYPE_DRAW_DATA -> DrawData::class.java
+                            TYPE_DRAW_DATA    -> DrawData::class.java
                             TYPE_ANNOUNCEMENT -> Announcement::class.java
+                            TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
                             else -> BaseModel::class.java   //throw IllegalArgumentException("Unknown message type")
                         }
 

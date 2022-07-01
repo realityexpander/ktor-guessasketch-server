@@ -1,7 +1,12 @@
 package com.realityexpander.data
 
+import com.realityexpander.data.models.socket.Announcement
+import com.realityexpander.gson
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.isActive
+
+const val ONE_PLAYER = 1
+const val TWO_PLAYERS = 2
 
 class Room(
     val name: String,
@@ -28,6 +33,8 @@ class Room(
             }
         }
     }
+
+    ////// GAME STATE MACHINE ///////
 
     private var gamePhaseChangeListener: ((GamePhase) -> Unit)? = null
     var phase = GamePhase.WAITING_FOR_PLAYERS
@@ -64,6 +71,42 @@ class Room(
 
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    ////// DATABASE OPERATIONS ///////
+
+    suspend fun addPlayer(
+        clientId: String,
+        playerName: String,
+        socketSession: WebSocketSession
+    ): Player {
+        val newPlayer = Player(playerName, socketSession, clientId)
+
+        // we use `x=x+y` instead of `x+=y`, because we want a copy of the immutable list to work in concurrent environments
+        players = players + newPlayer
+
+        if (players.size == ONE_PLAYER) {
+            phase = GamePhase.WAITING_FOR_PLAYERS
+        } else if (players.size == TWO_PLAYERS && phase == GamePhase.WAITING_FOR_PLAYERS) {
+            phase = GamePhase.WAITING_FOR_START
+            players = players.shuffled()
+        } else if (phase == GamePhase.WAITING_FOR_START && players.size == maxPlayers) {
+            phase = GamePhase.NEW_ROUND
+            players = players.shuffled()
+        }
+
+        val announcement = Announcement( "Player $playerName has joined the game",
+            System.currentTimeMillis(),
+            Announcement.TYPE_PLAYER_JOINED
+        )
+        broadcast(gson.toJson(announcement))
+
+        return newPlayer
+    }
+
+    //////// MESSAGING /////////
+
     suspend fun broadcast(message: String) {
         players.forEach {player ->
           if(player.socket.isActive) {
@@ -80,7 +123,9 @@ class Room(
         }
     }
 
+    //////// UTILITIES /////////
+
     fun containsPlayer(playerName: String): Boolean {
-        return players.find { it.username == playerName } != null
+        return players.find { it.playerName == playerName } != null
     }
 }

@@ -14,7 +14,6 @@ import com.realityexpander.routes.getRoomsRoute
 import com.realityexpander.routes.joinRoomRoute
 import com.realityexpander.session.DrawingSession
 import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.request.*
 import io.ktor.routing.*
 import io.ktor.sessions.*
@@ -23,7 +22,7 @@ import io.ktor.websocket.*
 import org.slf4j.event.Level
 
 // Globals
-val server = DrawingServer() // represent the database
+val serverDB = DrawingServer() // represent the database
 val gson = Gson()
 
 fun main(args: Array<String>): Unit =

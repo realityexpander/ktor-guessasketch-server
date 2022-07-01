@@ -6,7 +6,7 @@ import com.realityexpander.data.models.response.BasicApiResponse
 import com.realityexpander.data.models.response.BasicApiResponseWithData
 import com.realityexpander.data.models.request.CreateRoomRequest
 import com.realityexpander.data.models.socket.RoomResponse
-import com.realityexpander.server
+import com.realityexpander.serverDB
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.request.*
@@ -25,7 +25,7 @@ fun Route.createRoomRoute() {
             }
 
             // Check if room exists
-            if(server.rooms[roomRequest.name] != null) {
+            if(serverDB.rooms[roomRequest.name] != null) {
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponse(
                         false,
@@ -59,7 +59,7 @@ fun Route.createRoomRoute() {
 
             // Create the room
             val room = Room(roomRequest.name, roomRequest.maxPlayers)
-            server.rooms[roomRequest.name] = room
+            serverDB.rooms[roomRequest.name] = room
 
             println("Created room: ${roomRequest.name}")
 
@@ -90,7 +90,7 @@ fun Route.getRoomsRoute() {
             }
 
             // find rooms matching name
-            val roomsResult = server.rooms.filterKeys { roomName ->
+            val roomsResult = serverDB.rooms.filterKeys { roomName ->
                 roomName.contains(searchQuery, ignoreCase = true)
             }
 
@@ -116,7 +116,7 @@ fun Route.joinRoomRoute() {
     route("/api/joinRoom") {
         get {
             val roomName = call.parameters["roomName"]
-            val playerName = call.parameters["username"]
+            val playerName = call.parameters["playerName"]
 
             if(roomName == null || playerName == null) {
                 call.respond(HttpStatusCode.BadRequest,
@@ -129,7 +129,7 @@ fun Route.joinRoomRoute() {
             }
 
             // find room
-            val room = server.rooms[roomName]
+            val room = serverDB.rooms[roomName]
 
             // check if room exists
             if(room == null) {
