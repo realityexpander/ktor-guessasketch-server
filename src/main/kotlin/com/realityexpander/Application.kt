@@ -5,6 +5,7 @@ package com.realityexpander
 // Ktor generator
 // https://start.ktor.io/#/final?name=ktor-drawing-server&website=realityexpander.com&artifact=com.realityexpander.ktor-drawing-server&kotlinVersion=1.7.0&ktorVersion=1.5.3&buildSystem=GRADLE&engine=NETTY&configurationIn=HOCON&addSampleCode=true&plugins=content-negotiation%2Crouting%2Cktor-gson%2Cktor-websockets%2Cshutdown-url%2Ccall-logging
 
+import com.google.gson.Gson
 import io.ktor.application.*
 import com.realityexpander.plugins.*
 import com.realityexpander.routes.createRoomRoute
@@ -22,6 +23,7 @@ import org.slf4j.event.Level
 
 // Globals
 val server = DrawingServer() // represent the database
+val gson = Gson()
 
 fun main(args: Array<String>): Unit =
     io.ktor.server.netty.EngineMain.main(args)
