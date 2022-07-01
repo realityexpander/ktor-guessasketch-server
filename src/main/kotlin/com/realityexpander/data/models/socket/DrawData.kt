@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.socket
 
-import com.realityexpander.common.Constants.TYPE_DRAW_DATA
+import com.realityexpander.data.models.socket.Constants.TYPE_DRAW_DATA
 
 data class DrawData(
     val roomName: String,

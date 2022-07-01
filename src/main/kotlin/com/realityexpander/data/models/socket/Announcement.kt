@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.socket
 
-import com.realityexpander.common.Constants.TYPE_ANNOUNCEMENT
+import com.realityexpander.data.models.socket.Constants.TYPE_ANNOUNCEMENT
 
 data class Announcement(
     val message: String,

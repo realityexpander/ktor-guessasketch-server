@@ -5,7 +5,7 @@ import com.realityexpander.data.Room
 import com.realityexpander.data.models.response.BasicApiResponse
 import com.realityexpander.data.models.response.BasicApiResponseWithData
 import com.realityexpander.data.models.request.CreateRoomRequest
-import com.realityexpander.data.models.socket.RoomResponse
+import com.realityexpander.data.models.response.RoomResponse
 import com.realityexpander.serverDB
 import io.ktor.application.*
 import io.ktor.http.*
@@ -96,7 +96,7 @@ fun Route.getRoomsRoute() {
 
             // collect data for response
             val roomResponses = roomsResult.values.map {room ->
-                RoomResponse(room.name, room.maxPlayers, room.players.size)
+                RoomResponse(room.roomName, room.maxPlayers, room.players.size)
             }.sortedBy {  room ->
                 room.roomName
             }

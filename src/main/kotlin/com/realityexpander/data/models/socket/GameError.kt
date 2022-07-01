@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.socket
 
-import com.realityexpander.common.Constants.TYPE_GAME_ERROR
+import com.realityexpander.data.models.socket.Constants.TYPE_GAME_ERROR
 
 data class GameError(
     val errorType: Int

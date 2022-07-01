@@ -1,13 +1,15 @@
 package com.realityexpander.routes
 
 import com.google.gson.JsonParser
-import com.realityexpander.common.Constants.TYPE_ANNOUNCEMENT
-import com.realityexpander.common.Constants.TYPE_CHAT_MESSAGE
-import com.realityexpander.common.Constants.TYPE_DRAW_DATA
-import com.realityexpander.common.Constants.TYPE_JOIN_ROOM_HANDSHAKE
+import com.realityexpander.data.models.socket.Constants.TYPE_ANNOUNCEMENT
+import com.realityexpander.data.models.socket.Constants.TYPE_CHAT_MESSAGE
+import com.realityexpander.data.models.socket.Constants.TYPE_DRAW_DATA
+import com.realityexpander.data.models.socket.Constants.TYPE_JOIN_ROOM_HANDSHAKE
 import com.realityexpander.data.Player
 import com.realityexpander.data.Room
 import com.realityexpander.data.models.socket.*
+import com.realityexpander.data.models.socket.Constants.TYPE_CHOSEN_WORD
+import com.realityexpander.data.models.socket.Constants.TYPE_GAME_PHASE_CHANGE
 import com.realityexpander.gson
 import com.realityexpander.serverDB
 import com.realityexpander.session.DrawingSession
@@ -46,9 +48,14 @@ fun Route.gameWebSocketRoute() {
                 is DrawData -> {
                     val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
 
-                    if(room.phase == Room.GamePhase.ROUND_IN_PROGRESS) {
+                    if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExcept(messageJson, clientId)
                     }
+                }
+                is WordToGuess -> {
+                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
+
+                    room.setWordToGuessAndStartRound(payload.wordToGuess)
                 }
                 is ChatMessage -> {
 
@@ -89,6 +96,8 @@ fun Route.standardWebSocket(
                             TYPE_DRAW_DATA    -> DrawData::class.java
                             TYPE_ANNOUNCEMENT -> Announcement::class.java
                             TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
+                            TYPE_GAME_PHASE_CHANGE -> GamePhaseChange::class.java
+                            TYPE_CHOSEN_WORD -> WordToGuess::class.java
                             else -> BaseModel::class.java   //throw IllegalArgumentException("Unknown message type")
                         }
 
