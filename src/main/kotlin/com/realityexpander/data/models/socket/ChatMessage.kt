@@ -1,4 +1,4 @@
-package com.realityexpander.data.models
+package com.realityexpander.data.models.socket
 
 import com.realityexpander.common.Constants.TYPE_CHAT_MESSAGE
 

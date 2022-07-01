@@ -9,6 +9,7 @@ import com.google.gson.Gson
 import io.ktor.application.*
 import com.realityexpander.plugins.*
 import com.realityexpander.routes.createRoomRoute
+import com.realityexpander.routes.gameWebSocketRoute
 import com.realityexpander.routes.getRoomsRoute
 import com.realityexpander.routes.joinRoomRoute
 import com.realityexpander.session.DrawingSession
@@ -50,6 +51,7 @@ fun Application.module() {
         createRoomRoute()
         getRoomsRoute()
         joinRoomRoute()
+        gameWebSocketRoute()
     }
 
     install(CallLogging) {

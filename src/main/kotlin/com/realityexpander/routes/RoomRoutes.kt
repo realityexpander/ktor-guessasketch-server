@@ -1,12 +1,11 @@
 package com.realityexpander.routes
 
 import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
-import com.realityexpander.data.Player
 import com.realityexpander.data.Room
-import com.realityexpander.data.models.BasicApiResponse
-import com.realityexpander.data.models.BasicApiResponseWithData
-import com.realityexpander.data.models.CreateRoomRequest
-import com.realityexpander.data.models.RoomResponse
+import com.realityexpander.data.models.response.BasicApiResponse
+import com.realityexpander.data.models.response.BasicApiResponseWithData
+import com.realityexpander.data.models.request.CreateRoomRequest
+import com.realityexpander.data.models.socket.RoomResponse
 import com.realityexpander.server
 import io.ktor.application.*
 import io.ktor.http.*
