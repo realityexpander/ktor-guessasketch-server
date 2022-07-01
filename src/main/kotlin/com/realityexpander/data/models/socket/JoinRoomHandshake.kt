@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.socket
 
-import com.realityexpander.data.models.socket.Constants.TYPE_JOIN_ROOM_HANDSHAKE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_JOIN_ROOM_HANDSHAKE
 
 data class JoinRoomHandshake(
     val playerName: String,

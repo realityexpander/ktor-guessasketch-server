@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.socket
 
-import com.realityexpander.data.models.socket.Constants.TYPE_CHAT_MESSAGE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHAT_MESSAGE
 
 data class ChatMessage(
     val from: String,  // sender clientId

@@ -6,4 +6,6 @@ object Constants {
     // Scoring
     const val SCORE_PER_SECOND = 1
     const val SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD = 50
+
+    // Game
 }

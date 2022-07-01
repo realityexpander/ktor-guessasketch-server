@@ -1,9 +1,10 @@
 package com.realityexpander.data
 
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
-import com.realityexpander.data.models.socket.Announcement
-import com.realityexpander.data.models.socket.WordToGuess
-import com.realityexpander.data.models.socket.GamePhaseChange
+import com.realityexpander.common.getRandomWords
+import com.realityexpander.common.transformToUnderscores
+import com.realityexpander.common.words
+import com.realityexpander.data.models.socket.*
 import com.realityexpander.gson
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
@@ -38,6 +39,8 @@ class Room(
     private var drawingPlayer: Player? = null
     private var winningPlayers = listOf<Player>()
     private var wordToGuess: String? = null
+    private var curWords: List<String>? = null
+    private var drawingPlayerIndex = 0
 
 
     ////// GAME STATE MACHINE ///////
@@ -96,13 +99,52 @@ class Room(
     }
 
     private fun newRoundPhase(){
-        GlobalScope.launch {
+        curWords = getRandomWords(3)
+        val newWordsToGuess = NewWords(curWords!!)
 
+        proceedToNextDrawingPlayer()
+        GlobalScope.launch {
+            sendToOnePlayer(gson.toJson(newWordsToGuess), drawingPlayer)
+            startGamePhaseCountdownTimerAndNotify(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
         }
     }
 
-    private fun roundInProgressPhase(){
-        // game_running
+    private fun roundInProgressPhase(){ // game_running
+        winningPlayers = listOf() // reset the winning players
+        val wordToSend = wordToGuess ?: curWords?.random() ?: words.random()
+        val wordAsUnderscores = wordToSend.transformToUnderscores()
+        val drawingPlayerName = (drawingPlayer ?: players.random()).playerName
+
+        // Drawing player gets the word to guess
+        val gameStateForDrawingPlayer = GameState(
+            drawingPlayerName,
+            wordToSend
+        )
+
+        // Other players get the word to guess as underscores
+        val gameStateForGuessingPlayers = GameState(
+            drawingPlayerName,
+            wordAsUnderscores
+        )
+
+        // Send the new GameState to all players
+        GlobalScope.launch {
+            broadcastToAllExceptOneClientId(
+                gson.toJson(gameStateForGuessingPlayers),
+                drawingPlayer?.clientId ?: players.random().clientId
+            )
+            sendToOnePlayer(gson.toJson(gameStateForDrawingPlayer), drawingPlayer)
+        }
+
+        startGamePhaseCountdownTimerAndNotify(
+            DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
+        )
+
+        println("Starting ROUND_IN_PROGRESS phase for $roomName,\n " +
+                "drawing player: $drawingPlayerName\n" +
+                "word to guess: $wordToSend\n" +
+                "Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
+
     }
 
     private fun roundEndedPhase(){
@@ -131,14 +173,33 @@ class Room(
                 gamePhase = GamePhase.ROUND_ENDED,
                 DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
             )
-            broadcast(gson.toJson(gamePhaseChange))
 
+            broadcast(gson.toJson(gamePhaseChange))
         }
     }
+
+    // GAME STATE UTILS //
 
     fun setWordToGuessAndStartRound(wordToGuess: String) {
         this.wordToGuess = wordToGuess
         gamePhase = GamePhase.ROUND_IN_PROGRESS
+    }
+    
+    fun proceedToNextDrawingPlayer() {
+        drawingPlayer?.isDrawing = false
+        if(players.isEmpty()) return
+
+        drawingPlayer = if(drawingPlayerIndex <= players.size - 1) {
+            players[drawingPlayerIndex]
+        } else {
+            players.last()
+        }
+        
+        if(drawingPlayerIndex <= players.size - 1) {
+            drawingPlayerIndex++
+        } else {
+            drawingPlayerIndex = 0
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,10 +285,18 @@ class Room(
         }
     }
 
-    suspend fun broadcastToAllExcept(message: String, clientIdToExclude: String) {
+    suspend fun broadcastToAllExceptOneClientId(messageJson: String, clientIdToExclude: String) {
         players.forEach {player ->
             if(player.clientId != clientIdToExclude && player.socket.isActive) {
-                player.socket.send(Frame.Text(message))
+                player.socket.send(Frame.Text(messageJson))
+            }
+        }
+    }
+
+    suspend fun sendToOnePlayer(messageJson: String, player: Player?) {
+        player?.let {
+            if(it.socket.isActive) {
+                it.socket.send(Frame.Text(messageJson))
             }
         }
     }

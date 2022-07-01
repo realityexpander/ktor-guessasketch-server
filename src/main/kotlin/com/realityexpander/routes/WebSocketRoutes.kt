@@ -1,15 +1,16 @@
 package com.realityexpander.routes
 
 import com.google.gson.JsonParser
-import com.realityexpander.data.models.socket.Constants.TYPE_ANNOUNCEMENT
-import com.realityexpander.data.models.socket.Constants.TYPE_CHAT_MESSAGE
-import com.realityexpander.data.models.socket.Constants.TYPE_DRAW_DATA
-import com.realityexpander.data.models.socket.Constants.TYPE_JOIN_ROOM_HANDSHAKE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_ANNOUNCEMENT
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHAT_MESSAGE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_DRAW_DATA
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_JOIN_ROOM_HANDSHAKE
 import com.realityexpander.data.Player
 import com.realityexpander.data.Room
 import com.realityexpander.data.models.socket.*
-import com.realityexpander.data.models.socket.Constants.TYPE_CHOSEN_WORD
-import com.realityexpander.data.models.socket.Constants.TYPE_GAME_PHASE_CHANGE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHOSEN_WORD
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_GAME_PHASE_CHANGE
+import com.realityexpander.data.models.socket.TypeConstants.TYPE_GAME_STATE
 import com.realityexpander.gson
 import com.realityexpander.serverDB
 import com.realityexpander.session.DrawingSession
@@ -28,6 +29,7 @@ fun Route.gameWebSocketRoute() {
 
                     if (room == null) {
                         val gameError = GameError(GameError.ERROR_TYPE_ROOM_NOT_FOUND)
+                        // val gameError = GameError.ERROR_TYPE_ROOM_NOT_FOUND_MSG
                         socket.send(Frame.Text(gson.toJson(gameError))) // send error message to specific user who tried to join
                         return@standardWebSocket
                     }
@@ -49,7 +51,7 @@ fun Route.gameWebSocketRoute() {
                     val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
 
                     if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
-                        room.broadcastToAllExcept(messageJson, clientId)
+                        room.broadcastToAllExceptOneClientId(messageJson, clientId)
                     }
                 }
                 is WordToGuess -> {
@@ -93,11 +95,12 @@ fun Route.standardWebSocket(
                     // Get the type of message
                     val type = when(jsonObject.get("type").asString) {
                             TYPE_CHAT_MESSAGE -> ChatMessage::class.java
-                            TYPE_DRAW_DATA    -> DrawData::class.java
+                            TYPE_DRAW_DATA -> DrawData::class.java
                             TYPE_ANNOUNCEMENT -> Announcement::class.java
                             TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
                             TYPE_GAME_PHASE_CHANGE -> GamePhaseChange::class.java
                             TYPE_CHOSEN_WORD -> WordToGuess::class.java
+                            TYPE_GAME_STATE -> GameState::class.java
                             else -> BaseModel::class.java   //throw IllegalArgumentException("Unknown message type")
                         }
 
