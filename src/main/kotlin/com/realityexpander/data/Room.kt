@@ -103,7 +103,7 @@ class Room(
         }
     }
 
-    private fun newRoundPhase(){
+    private fun newRoundPhase() {  // newRound // todo remove at end
         curWords = getRandomWords(3)
         val newWordsToGuess = NewWords(curWords!!)
 
@@ -111,10 +111,11 @@ class Room(
         GlobalScope.launch {
             sendToOnePlayer(gson.toJson(newWordsToGuess), drawingPlayer)
             startGamePhaseCountdownTimerAndNotify(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
+            broadcastAllPlayersData()
         }
     }
 
-    private fun roundInProgressPhase(){ // game_running
+    private fun roundInProgressPhase(){ // game_running gameRunning  // todo remove at end
         winningPlayers = listOf() // reset the winning players
         val wordToSend = wordToGuess ?: curWords?.random() ?: words.random()
         val wordAsUnderscores = wordToSend.transformToUnderscores()
@@ -153,7 +154,7 @@ class Room(
     }
 
     private fun roundEndedPhase(){
-        // show_word
+        // showWord, show_word // todo remove at end
 
         GlobalScope.launch {
 
@@ -163,6 +164,9 @@ class Room(
                     player.score -= SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
                 }
             }
+
+            // Score has possibly changed
+            broadcastAllPlayersData()
 
             // Broadcast the wordToGuess to all players
             wordToGuess?.let { wordToGuess ->
@@ -231,7 +235,7 @@ class Room(
     // Returns true if the player has guessed the word
     suspend fun checkWordThenScoreAndNotifyPlayers(message: ChatMessage): Boolean {
         if(isGuessCorrect(message)) {
-            val winningPlayer = getPlayerByPlayerClientId(message.fromPlayerClientId) ?: return false
+            val winningPlayer = getPlayerByClientId(message.fromPlayerClientId) ?: return false
 
             // Calc score for winning player
             val guessTimeMillis = System.currentTimeMillis() - gamePhaseStartTimeMillis
@@ -265,13 +269,15 @@ class Room(
                 broadcast(gson.toJson(announcement))
             }
 
+            // Update all players about current scores
+            broadcastAllPlayersData()
+
             return true
         }
 
         return false
 
     }
-
 
     // When a player joins a room (connect or reconnects)
     // Inform the player of the word to guess and the current phase
@@ -301,6 +307,21 @@ class Room(
         }
 
         sendToOnePlayer(gson.toJson(gamePhaseChange), player)
+    }
+
+    // Send data of players (score, rank, name, etc) to all the players
+    suspend fun broadcastAllPlayersData() {
+        // Collect the data for all players
+        val playersList = players.sortedByDescending { it.score }.map { player ->
+            PlayerData(player.playerName, player.isDrawing, player.score, player.rank)
+        }
+
+        // set the ranking for each player
+        playersList.forEachIndexed { index, playerData ->
+            playerData.rank = index + 1
+        }
+
+        broadcast(gson.toJson(PlayersList(playersList)))
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -335,6 +356,8 @@ class Room(
             players = players.shuffled()
         }
 
+        sendWordToPlayer(newPlayer)
+
         // Send announcement to all players
         val announcement = Announcement( "Player $playerName has joined the game",
             System.currentTimeMillis(),
@@ -342,7 +365,16 @@ class Room(
         )
         broadcast(gson.toJson(announcement))
 
+        // Send the all current players' data to all players
+        broadcastAllPlayersData()
+
         return newPlayer
+    }
+
+    fun removePlayer(clientId: String) {
+        GlobalScope.launch {
+            broadcastAllPlayersData()
+        }
     }
 
     //////// MESSAGING /////////
@@ -414,7 +446,7 @@ class Room(
         return find { it.clientId == playerClientId } != null
     }
 
-    fun getPlayerByPlayerClientId(playerClientId: String): Player? {
+    fun getPlayerByClientId(playerClientId: String): Player? {
         return players.find { it.clientId == playerClientId }
     }
 }

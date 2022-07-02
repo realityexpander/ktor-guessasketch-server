@@ -1,16 +1,9 @@
 package com.realityexpander.routes
 
 import com.google.gson.JsonParser
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_ANNOUNCEMENT
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHAT_MESSAGE
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_DRAW_DATA
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_JOIN_ROOM_HANDSHAKE
 import com.realityexpander.data.Player
 import com.realityexpander.data.Room
 import com.realityexpander.data.models.socket.*
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHOSEN_WORD
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_GAME_PHASE_CHANGE
-import com.realityexpander.data.models.socket.TypeConstants.TYPE_GAME_STATE
 import com.realityexpander.gson
 import com.realityexpander.serverDB
 import com.realityexpander.session.DrawingSession
@@ -80,7 +73,7 @@ fun Route.standardWebSocket(
         socket: DefaultWebSocketServerSession,  // connection of 1 client to server
         clientId: String, // clientId is a unique identifier for this player (client)
         messageJson: String,  // json message is the text sent by the client (json)
-        payload: BaseModel, // wrapper around message (unserialized from json `message`)
+        payload: BaseSocketType, // wrapper around message (unserialized from json `message`)
     ) -> Unit
 ) {
     webSocket {
@@ -98,16 +91,22 @@ fun Route.standardWebSocket(
                     val jsonObject = JsonParser.parseString(messageJson).asJsonObject
 
                     // Get the type of message
-                    val type = when(jsonObject.get("type").asString) {
-                            TYPE_CHAT_MESSAGE -> ChatMessage::class.java
-                            TYPE_DRAW_DATA -> DrawData::class.java
-                            TYPE_ANNOUNCEMENT -> Announcement::class.java
-                            TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
-                            TYPE_GAME_PHASE_CHANGE -> GamePhaseChange::class.java
-                            TYPE_CHOSEN_WORD -> WordToGuess::class.java
-                            TYPE_GAME_STATE -> GameState::class.java
-                            else -> BaseModel::class.java   //throw IllegalArgumentException("Unknown message type")
-                        }
+                    val typeStr = jsonObject["type"].asString
+                    val type = TypeHolder().socketTypes[typeStr]
+                        ?: BaseSocketType::class.java //throw IllegalArgumentException("Unknown message type")
+
+//                    // Get the type of message
+//                    val type = when(jsonObject.get("type").asString) {
+//                            TYPE_CHAT_MESSAGE -> ChatMessage::class.java
+//                            TYPE_DRAW_DATA -> DrawData::class.java
+//                            TYPE_ANNOUNCEMENT -> Announcement::class.java
+//                            TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
+//                            TYPE_GAME_PHASE_CHANGE -> GamePhaseChange::class.java
+//                            TYPE_WORD_TO_GUESS -> WordToGuess::class.java
+//                            TYPE_GAME_STATE -> GameState::class.java
+//                            TYPE_PLAYERS_LIST -> PlayersList::class.java
+//                            else -> BaseSocketType::class.java   //throw IllegalArgumentException("Unknown message type")
+//                        }
 
                     val payload = gson.fromJson(messageJson, type) // converts JSON to the type from the webSocket message
                     handleFrame(this, session.clientId, messageJson, payload)
