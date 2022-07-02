@@ -61,7 +61,7 @@ fun Route.gameWebSocketRoute() {
                     }
                 }
                 else -> {
-
+                    println("Unknown socketType for $payload")
                 }
             }
         }
@@ -93,7 +93,10 @@ fun Route.standardWebSocket(
                     // Get the type of message
                     val typeStr = jsonObject["type"].asString
                     val type = TypeHolder().socketTypes[typeStr]
-                        ?: BaseSocketType::class.java //throw IllegalArgumentException("Unknown message type")
+                        ?: let {
+                            println("Unknown socketType: $typeStr for $messageJson")
+                            BaseSocketType::class.java //throw IllegalArgumentException("Unknown message type")
+                        }
 
 //                    // Get the type of message
 //                    val type = when(jsonObject.get("type").asString) {

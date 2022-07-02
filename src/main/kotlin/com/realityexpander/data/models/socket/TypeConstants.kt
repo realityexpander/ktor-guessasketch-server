@@ -16,8 +16,8 @@ package com.realityexpander.data.models.socket
 //}
 
 data class TypeHolder(val socketTypes: MutableMap<String, Class<out BaseSocketType>> = mutableMapOf() ) {
-    init {
 
+    init {
         socketTypes[TYPE_CHAT_MESSAGE]        = ChatMessage::class.java
         socketTypes[TYPE_DRAW_DATA]           = DrawData::class.java
         socketTypes[TYPE_ANNOUNCEMENT]        = Announcement::class.java
