@@ -339,7 +339,7 @@ class Room(
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-    ////// DATABASE OPERATIONS ///////
+    ////// ROOM DATABASE OPERATIONS ///////
 
     suspend fun addPlayer(
         clientId: ClientId,
@@ -427,17 +427,18 @@ class Room(
     //   -> wait PLAYER_REMOVE_DELAY_MILLIS ms
     //   -> finally remove player from room & exiting list
     //   -> remove the player from the server
-    //
-    fun removePlayer(removeClientId: ClientId, removeImmediately: Boolean = false) {
+    fun removePlayer(removeClientId: ClientId, isImmediateRemoval: Boolean = false) {
         val playerToRemove = getPlayerByClientId(removeClientId) ?: return
         val index = players.indexOf(playerToRemove)
 
-        if (!removeImmediately) {
+        if (!isImmediateRemoval) {
+            // Delayed removal of player (allows for reconnects with 60s)
+
             // Add player to exiting list
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
             //players = players - player // phillip mistake? todo
 
-            // Launch the "final" remove player function that will happen PLAYER_REMOVE_DELAY_MILLIS from now.
+            // Launch the "final" remove player job that will happen in PLAYER_REMOVE_DELAY_MILLIS from now.
             playerRemoveJobs[removeClientId] = GlobalScope.launch {
                 delay(PLAYER_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
 
@@ -466,6 +467,7 @@ class Room(
                 }
             }
         } else {
+            // Removing Player Immediately
             println("Removing player ${playerToRemove.playerName}")
 
             // Remove the player from this room

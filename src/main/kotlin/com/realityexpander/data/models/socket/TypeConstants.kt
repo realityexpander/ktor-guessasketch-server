@@ -16,6 +16,7 @@ object SocketMessageType {
     const val TYPE_GAME_STATE          = "TYPE_GAME_STATE" // contains player & wordToGuess
     const val TYPE_NEW_WORDS           = "TYPE_NEW_WORDS" // contains new words
     const val TYPE_PLAYERS_LIST        = "TYPE_PLAYERS_LIST" // contains list of player data (score, rank, etc)
+    const val TYPE_PING                = "TYPE_PING"
 
     val messageTypeMap: MutableMap<String, Class<out BaseMessageType>> = mutableMapOf()
 
@@ -30,6 +31,7 @@ object SocketMessageType {
         messageTypeMap[TYPE_GAME_STATE]          = GameState::class.java
         messageTypeMap[TYPE_NEW_WORDS]           = NewWords::class.java
         messageTypeMap[TYPE_PLAYERS_LIST]        = PlayersList::class.java
+        messageTypeMap[TYPE_PING]                = Ping::class.java
     }
 
     fun getMessageTypeStringForMessageTypeClass(messageTypeClass: Class<out BaseMessageType>): String? {

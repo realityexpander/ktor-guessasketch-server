@@ -25,7 +25,7 @@ fun Route.createRoomRoute() {
             }
 
             // Check if room exists
-            if(serverDB.rooms[roomRequest.name] != null) {
+            if(serverDB.roomsDB[roomRequest.name] != null) {
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponse(
                         false,
@@ -59,7 +59,7 @@ fun Route.createRoomRoute() {
 
             // Create the room
             val room = Room(roomRequest.name, roomRequest.maxPlayers)
-            serverDB.rooms[roomRequest.name] = room
+            serverDB.roomsDB[roomRequest.name] = room
 
             println("Created room: ${roomRequest.name}")
 
@@ -90,7 +90,7 @@ fun Route.getRoomsRoute() {
             }
 
             // find rooms matching name
-            val roomsResult = serverDB.rooms.filterKeys { roomName ->
+            val roomsResult = serverDB.roomsDB.filterKeys { roomName ->
                 roomName.contains(searchQuery, ignoreCase = true)
             }
 
@@ -129,7 +129,7 @@ fun Route.joinRoomRoute() {
             }
 
             // find room
-            val room = serverDB.rooms[roomName]
+            val room = serverDB.roomsDB[roomName]
 
             // check if room exists
             if(room == null) {

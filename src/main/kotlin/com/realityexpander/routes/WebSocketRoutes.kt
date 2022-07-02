@@ -22,7 +22,7 @@ fun Route.gameWebSocketRoute() {
                     serverDB.addRoom(payload.roomName)
                 }
                 is JoinRoomHandshake -> {
-                    val room = serverDB.rooms[payload.roomName]
+                    val room = serverDB.roomsDB[payload.roomName]
 
                     if (room == null) {
                         val gameError = GameError(GameError.ERROR_TYPE_ROOM_NOT_FOUND)
@@ -39,27 +39,30 @@ fun Route.gameWebSocketRoute() {
                     )
 
                     // Add player to room
-                    serverDB.addPlayerToRoom(newPlayer, room)
+                    serverDB.addPlayerToRoom(newPlayer, room, socket)
                 }
                 is DrawData -> {
-                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
+                    val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
                     if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                     }
                 }
                 is SetWordToGuess -> {
-                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
+                    val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
                     room.setWordToGuessAndStartRound(payload.wordToGuess)
                 }
                 is ChatMessage -> {
-                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
+                    val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
                     // Does this message text contain the correct guess for the word?
                     if(!room.checkWordThenScoreAndNotifyPlayers(payload)) {
                         room.broadcast(messageJson)
                     }
+                }
+                is Ping -> {
+                    serverDB.playersDB[clientId]?.receivedPong()
                 }
                 else -> {
                     println("Unknown socketType for $payload")
@@ -102,7 +105,7 @@ fun Route.standardWebSocket(
                     val type = SocketMessageType.messageTypeMap[typeStr]
                         ?: let {
                             println("Error: Unknown socketType: $typeStr for $messageJson")
-                            BaseMessageType::class.java //throw IllegalArgumentException("Unknown message type")
+                            BaseMessageType::class.java // throw IllegalArgumentException("Unknown message type")
                         }
 
                     // convert payload JSON string to the type from the webSocket message

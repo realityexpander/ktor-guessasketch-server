@@ -22,7 +22,7 @@ import io.ktor.websocket.*
 import org.slf4j.event.Level
 
 // Globals
-val serverDB = DrawingServer() // represent the database
+val serverDB = SketchServer() // represent the database
 val gson = Gson()
 
 fun main(args: Array<String>): Unit =
