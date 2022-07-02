@@ -215,8 +215,8 @@ class Room(
     //   winning player (ie: no cheating for entering the word multiple times!)
     fun isGuessCorrect(guessChatMessage: ChatMessage): Boolean {
         return guessChatMessage.containsWord(wordToGuess ?: return false)
-                && !winningPlayers.containsPlayerClientId(guessChatMessage.fromPlayerClientId)
-                && guessChatMessage.fromPlayerClientId != drawingPlayer?.clientId
+                && !winningPlayers.containsPlayerClientId(guessChatMessage.fromClientId)
+                && guessChatMessage.fromClientId != drawingPlayer?.clientId
                 && gamePhase == GamePhase.ROUND_IN_PROGRESS
     }
 
@@ -235,7 +235,7 @@ class Room(
     // Returns true if the player has guessed the word
     suspend fun checkWordThenScoreAndNotifyPlayers(message: ChatMessage): Boolean {
         if(isGuessCorrect(message)) {
-            val winningPlayer = getPlayerByClientId(message.fromPlayerClientId) ?: return false
+            val winningPlayer = getPlayerByClientId(message.fromClientId) ?: return false
 
             // Calc score for winning player
             val guessTimeMillis = System.currentTimeMillis() - gamePhaseStartTimeMillis
