@@ -5,5 +5,5 @@ import com.realityexpander.data.models.socket.SocketMessageType.TYPE_JOIN_ROOM_H
 data class JoinRoomHandshake(
     val playerName: String,
     val roomName: String,
-    val clientId: String
+    val clientId: ClientId
 ): BaseMessageType(TYPE_JOIN_ROOM_HANDSHAKE)

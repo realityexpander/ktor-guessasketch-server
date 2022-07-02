@@ -1,23 +1,24 @@
 package com.realityexpander.data
 
+import com.realityexpander.common.*
+import com.realityexpander.common.Constants.PLAYER_REMOVE_DELAY_MILLIS
 import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
-import com.realityexpander.common.getRandomWords
-import com.realityexpander.common.containsWord
-import com.realityexpander.common.transformToUnderscores
-import com.realityexpander.common.words
 import com.realityexpander.data.models.socket.*
+import com.realityexpander.data.models.socket.Announcement.Companion.TYPE_PLAYER_EXITED_ROOM
 import com.realityexpander.gson
+import com.realityexpander.serverDB
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
+import java.util.concurrent.ConcurrentHashMap
 
 const val ONE_PLAYER = 1
 const val TWO_PLAYERS = 2
 
 class Room(
-    val roomName: String,
+    val roomName: RoomName,
     val maxPlayers: Int,
     var players: List<Player> = listOf(),
 ) {
@@ -46,6 +47,10 @@ class Room(
     private var curWords: List<String>? = null
     private var drawingPlayerIndex = 0
     private var gamePhaseStartTimeMillis = 0L  // for score keeping
+
+    // Track players removing/reconnecting
+    private var playerRemoveJobs = ConcurrentHashMap<ClientId, Job>()
+    private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()
 
 
     ////// GAME STATE MACHINE ///////
@@ -170,7 +175,7 @@ class Room(
 
             // Broadcast the wordToGuess to all players
             wordToGuess?.let { wordToGuess ->
-                val word = WordToGuess(
+                val word = SetWordToGuess(
                     wordToGuess = wordToGuess,
                     roomName = roomName
                 )
@@ -193,7 +198,7 @@ class Room(
         this.wordToGuess = wordToGuess
         gamePhase = GamePhase.ROUND_IN_PROGRESS
     }
-    
+
     fun proceedToNextDrawingPlayer() {
         drawingPlayer?.isDrawing = false
         if(players.isEmpty()) return
@@ -203,7 +208,7 @@ class Room(
         } else {
             players.last()
         }
-        
+
         if(drawingPlayerIndex <= players.size - 1) {
             drawingPlayerIndex++
         } else {
@@ -310,7 +315,7 @@ class Room(
     }
 
     // Send data of players (score, rank, name, etc) to all the players
-    suspend fun broadcastAllPlayersData() {
+    suspend fun broadcastAllPlayersData() {  // broadcastPlayerStates // todo remove at end
         // Collect the data for all players
         val playersList = players.sortedByDescending { it.score }.map { player ->
             PlayerData(player.playerName, player.isDrawing, player.score, player.rank)
@@ -330,7 +335,7 @@ class Room(
     ////// DATABASE OPERATIONS ///////
 
     suspend fun addPlayer(
-        clientId: String,
+        clientId: ClientId,
         playerName: String,
         socketSession: WebSocketSession
     ): Player {
@@ -371,10 +376,73 @@ class Room(
         return newPlayer
     }
 
-    fun removePlayer(clientId: String) {
+    // Flow is:
+    // removePlayer() -> Add player to exiting List -> wait 60s -> finally remove player from room & exiting list
+    fun removePlayer(removeClientId: ClientId, removeImmediately: Boolean = false) {
+        val playerToRemove = getPlayerByClientId(removeClientId) ?: return
+        val index = players.indexOf(playerToRemove)
+
+        if (!removeImmediately) {
+            // Add player to exiting list
+            exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
+            //players = players - player // phillip mistake? todo
+
+            // Launch the "final" remove player function that will happen PLAYER_REMOVE_DELAY_MILLIS from now.
+            playerRemoveJobs[removeClientId] = GlobalScope.launch {
+                delay(PLAYER_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
+
+                val removePlayer = exitingPlayers[removeClientId]
+
+                // remove this player from our exitingPlayers list
+                exitingPlayers.remove(removeClientId)
+
+                // FINALLY remove the player from the room
+                removePlayer?.let { exitingPlayer ->
+                    players = players - exitingPlayer.player
+                }
+
+                // And remove this job
+                playerRemoveJobs -= removeClientId
+
+                // Check if there is only one player
+                if(players.size == 1) {
+                    gamePhase = GamePhase.WAITING_FOR_PLAYERS
+                    timerJob?.cancel()
+                }
+
+                // Check if there are no players
+                if(players.isEmpty()) {
+                    killRoom()
+                    //serverDB.rooms.remove(roomName)  // remove soon todo
+                    serverDB.removeRoomFromServer(roomName)
+                }
+            }
+        } else {
+            println("Removing player ${playerToRemove.playerName}")
+
+            // Remove the player from this room
+            players = players - playerToRemove
+
+            // Remove the player from the server
+            //serverDB.players -= playerToRemove.clientId // remove soon todo
+            serverDB.removePlayerFromServer(removeClientId)
+        }
+
+        // Tell all players that a player left
+        val announcement = Announcement(
+            message = "Player ${playerToRemove.playerName} has left the room.",
+            timestamp = System.currentTimeMillis(),
+            announcementType = TYPE_PLAYER_EXITED_ROOM
+        )
         GlobalScope.launch {
+            broadcast(gson.toJson(announcement))
             broadcastAllPlayersData()
         }
+    }
+
+    private fun killRoom() {
+        playerRemoveJobs.values.forEach { it.cancel() }
+        timerJob?.cancel()
     }
 
     //////// MESSAGING /////////
@@ -387,7 +455,7 @@ class Room(
             val gamePhaseChange = GamePhaseChange(
                 gamePhase,
                 startPhaseTimerMillis,
-                drawingPlayer?.playerName  // should use clientId? TODO
+                drawingPlayer?.playerName  // should use clientId? TODO probaly not...
             )
 
             // Update the countdown timer
@@ -420,7 +488,7 @@ class Room(
         }
     }
 
-    suspend fun broadcastToAllExceptOneClientId(messageJson: String, clientIdToExclude: String) {
+    suspend fun broadcastToAllExceptOneClientId(messageJson: String, clientIdToExclude: ClientId) {
         players.forEach {player ->
             if(player.clientId != clientIdToExclude && player.socket.isActive) {
                 player.socket.send(Frame.Text(messageJson))
@@ -442,12 +510,16 @@ class Room(
         return players.find { it.playerName == playerName } != null
     }
 
-    fun List<Player>.containsPlayerClientId(playerClientId: String): Boolean {
-        return find { it.clientId == playerClientId } != null
+    fun containsPlayerClientId(clientId: ClientId): Boolean {
+        return players.find { it.clientId == clientId } != null
     }
 
-    fun getPlayerByClientId(playerClientId: String): Player? {
-        return players.find { it.clientId == playerClientId }
+    fun List<Player>.containsPlayerClientId(clientId: ClientId): Boolean {
+        return find { it.clientId == clientId } != null
+    }
+
+    fun getPlayerByClientId(clientId: ClientId): Player? {
+        return players.find { it.clientId == clientId }
     }
 }
 
@@ -465,7 +537,7 @@ fun main() {
     data class PlayerA(
         val playerName: String,
         var socket: WebSocketSession? = null,
-        val clientId: String,
+        val clientId: ClientId,
         var isDrawing: Boolean = false,
         var score: Int = 0,
         var rank: Int = 0,

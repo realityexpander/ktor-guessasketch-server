@@ -24,7 +24,7 @@ object SocketMessageType {
         messageTypeMap[TYPE_ANNOUNCEMENT]        = Announcement::class.java
         messageTypeMap[TYPE_JOIN_ROOM_HANDSHAKE] = JoinRoomHandshake::class.java
         messageTypeMap[TYPE_GAME_PHASE_CHANGE]   = GamePhaseChange::class.java
-        messageTypeMap[TYPE_WORD_TO_GUESS]       = WordToGuess::class.java
+        messageTypeMap[TYPE_WORD_TO_GUESS]       = SetWordToGuess::class.java
         messageTypeMap[TYPE_GAME_STATE]          = GameState::class.java
         messageTypeMap[TYPE_NEW_WORDS]           = NewWords::class.java
         messageTypeMap[TYPE_PLAYERS_LIST]        = PlayersList::class.java
@@ -44,7 +44,7 @@ fun main() {
     println("class ChatMessage::class.java -> " +
             "${getMessageTypeStringForMessageTypeClass(ChatMessage::class.java)}")
 
-    // Won't compile - which is correct bc not a subclass of BaseMessageType
+    // Won't compile - which is correct bc `Unknown::class.java` is not a subclass of BaseMessageType
     //println("class Unknown::class.java ->" +
     //        "${getMessageTypeStringForMessageTypeClass(Unknown::class.java)}"
     //)

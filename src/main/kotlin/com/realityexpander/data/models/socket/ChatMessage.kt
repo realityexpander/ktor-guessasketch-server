@@ -1,9 +1,10 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.common.ClientId
 import com.realityexpander.data.models.socket.SocketMessageType.TYPE_CHAT_MESSAGE
 
 data class ChatMessage(
-    val fromClientId: String,
+    val fromClientId: ClientId,
     val fromPlayerName: String,
     val roomName: String,
     val message: String,

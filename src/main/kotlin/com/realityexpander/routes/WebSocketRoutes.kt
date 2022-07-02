@@ -1,6 +1,7 @@
 package com.realityexpander.routes
 
 import com.google.gson.JsonParser
+import com.realityexpander.common.ClientId
 import com.realityexpander.data.Player
 import com.realityexpander.data.Room
 import com.realityexpander.data.models.socket.*
@@ -35,10 +36,7 @@ fun Route.gameWebSocketRoute() {
                     )
 
                     // Add player to room
-                    serverDB.playerJoined(newPlayer)
-                    if(!room.containsPlayerName(newPlayer.playerName)) {
-                        room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
-                    }
+                    serverDB.addPlayerToRoom(newPlayer, room)
                 }
                 is DrawData -> {
                     val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
@@ -47,7 +45,7 @@ fun Route.gameWebSocketRoute() {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                     }
                 }
-                is WordToGuess -> {
+                is SetWordToGuess -> {
                     val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
 
                     room.setWordToGuessAndStartRound(payload.wordToGuess)
@@ -71,7 +69,7 @@ fun Route.gameWebSocketRoute() {
 fun Route.standardWebSocket(
     handleFrame: suspend (
         socket: DefaultWebSocketServerSession,  // connection of 1 client to server
-        clientId: String, // clientId is a unique identifier for this player (client)
+        clientId: ClientId, // clientId is a unique identifier for this player (client)
         messageJson: String,  // json message is the text sent by the client (json)
         payload: BaseMessageType, // wrapper around message (unserialized from json `message`)
     ) -> Unit
@@ -113,7 +111,20 @@ fun Route.standardWebSocket(
             e.printStackTrace()
             // close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Error: $e"))
         } finally {
-            // HANDLE DISCONNECTS //close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Closing"))
+            // HANDLE DISCONNECTS
+
+            // Find the player that disconnected
+            val player = serverDB.getRoomContainsClientId(session.clientId)
+                ?.players
+                ?.find { player ->
+                    player.clientId == session.clientId
+                }
+            // Remove the player
+            player?.let {
+                serverDB.removePlayerFromRoom(session.clientId)
+            }
+
+            //close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Closing")) // remove soon todo
         }
     }
 }
