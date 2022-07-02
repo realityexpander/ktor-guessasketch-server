@@ -24,11 +24,12 @@ class Room(
 ) {
 
     enum class GamePhase {
+        INITIAL_STATE,       // no state yet.
         WAITING_FOR_PLAYERS,
         WAITING_FOR_START,
         NEW_ROUND,
-        ROUND_IN_PROGRESS,  // game_running
-        ROUND_ENDED,  // show_word
+        ROUND_IN_PROGRESS,  // game_running  // todo remove at end
+        ROUND_ENDED,  // show_word // todo remove at end
     }
 
     companion object {
@@ -36,7 +37,7 @@ class Room(
 
         const val DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS = 10000L
         const val DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS = 20000L
-        const val DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS = 60000L
+        const val DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS = 10000L
         const val DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS = 10000L
     }
 
@@ -50,14 +51,16 @@ class Room(
 
     // Track players removing/reconnecting
     private var playerRemoveJobs = ConcurrentHashMap<ClientId, Job>()
-    private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()
+    private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()  // leftPlayers todo remove
 
 
     ////// GAME STATE MACHINE ///////
 
     init {
+        // When the gamePhase is set, this listener calls the appropriate func
         setGamePhaseChangeListener { newGamePhase ->
             when(newGamePhase) {
+                GamePhase.INITIAL_STATE -> { /* do nothing */ }
                 GamePhase.WAITING_FOR_PLAYERS -> waitingForPlayersPhase()
                 GamePhase.WAITING_FOR_START -> waitingForStartPhase()
                 GamePhase.NEW_ROUND -> newRoundPhase()
@@ -68,12 +71,13 @@ class Room(
     }
 
     private var gamePhaseChangeListener: ((GamePhase) -> Unit)? = null
-    var gamePhase = GamePhase.WAITING_FOR_PLAYERS
-        private set(value) {
+    var gamePhase = GamePhase.INITIAL_STATE
+        private set(newGamePhase) {
             synchronized(field) {  // to allow for concurrent access
-                field = value
-                gamePhaseChangeListener?.let { gamePhaseChange ->
-                    gamePhaseChange(value)  // set the next phase of the game
+                field = newGamePhase
+                println("Changing game phase to $newGamePhase")
+                gamePhaseChangeListener?.let { gamePhaseFunction ->
+                    gamePhaseFunction(newGamePhase)  // set the next phase of the game
                 }
             }
         }
@@ -87,10 +91,10 @@ class Room(
 
     private fun waitingForPlayersPhase(){
         GlobalScope.launch {
-            val gamePhaseChange = GamePhaseChange(
+            val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase = GamePhase.WAITING_FOR_PLAYERS
             )
-            broadcast(gson.toJson(gamePhaseChange))
+            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
@@ -100,11 +104,11 @@ class Room(
                 DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             )
 
-            val gamePhaseChange = GamePhaseChange(
+            val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase = GamePhase.WAITING_FOR_START,
                 DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             )
-            broadcast(gson.toJson(gamePhaseChange))
+            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
@@ -151,7 +155,7 @@ class Room(
             DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
         )
 
-        println("Starting ROUND_IN_PROGRESS phase for $roomName,\n " +
+        println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
                 "drawing player: $drawingPlayerName\n" +
                 "word to guess: $wordToSend\n" +
                 "Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
@@ -183,12 +187,12 @@ class Room(
             }
 
             startGamePhaseCountdownTimerAndNotify(DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS)
-            val gamePhaseChange = GamePhaseChange(
+            val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase = GamePhase.ROUND_ENDED,
                 DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
             )
 
-            broadcast(gson.toJson(gamePhaseChange))
+            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
@@ -295,7 +299,11 @@ class Room(
             else -> 0L
         }
 
-        val gamePhaseChange = GamePhaseChange(gamePhase, delay, drawingPlayer?.playerName)
+        // Send the current phase and the drawing player
+        val gamePhaseUpdate = GamePhaseUpdate(gamePhase, delay, drawingPlayer?.playerName)
+        sendToOnePlayer(gson.toJson(gamePhaseUpdate), player)
+
+        // If there is a word to guess, send it in the GameState
         wordToGuess?.let {curWordToGuess ->
             drawingPlayer?.let { drawingPlayer ->
                 val gameState = GameState(
@@ -311,7 +319,6 @@ class Room(
             }
         }
 
-        sendToOnePlayer(gson.toJson(gamePhaseChange), player)
     }
 
     // Send data of players (score, rank, name, etc) to all the players
@@ -341,7 +348,8 @@ class Room(
     ): Player {
         val newPlayer = Player(playerName, socketSession, clientId)
 
-        // we use `x=x+y` instead of `x+=y`, because we want a copy of the immutable list to work in concurrent environments
+        // we use `x=x+y` instead of `x+=y`, because we want to
+        //   use a copy of the immutable list to work in concurrent environments.
         players = players + newPlayer
 
         // Only player in the room?  -> keep waiting for more players
@@ -377,7 +385,12 @@ class Room(
     }
 
     // Flow is:
-    // removePlayer() -> Add player to exiting List -> wait 60s -> finally remove player from room & exiting list
+    // removePlayer(removeImmediately == false)
+    //   -> Add player to exiting List
+    //   -> wait PLAYER_REMOVE_DELAY_MILLIS ms
+    //   -> finally remove player from room & exiting list
+    //   -> remove the player from the server
+    //
     fun removePlayer(removeClientId: ClientId, removeImmediately: Boolean = false) {
         val playerToRemove = getPlayerByClientId(removeClientId) ?: return
         val index = players.indexOf(playerToRemove)
@@ -413,8 +426,6 @@ class Room(
                 // Check if there are no players
                 if(players.isEmpty()) {
                     killRoom()
-                    //serverDB.rooms.remove(roomName)  // remove soon todo
-                    serverDB.removeRoomFromServer(roomName)
                 }
             }
         } else {
@@ -424,7 +435,6 @@ class Room(
             players = players - playerToRemove
 
             // Remove the player from the server
-            //serverDB.players -= playerToRemove.clientId // remove soon todo
             serverDB.removePlayerFromServer(removeClientId)
         }
 
@@ -443,6 +453,7 @@ class Room(
     private fun killRoom() {
         playerRemoveJobs.values.forEach { it.cancel() }
         timerJob?.cancel()
+        serverDB.removeRoomFromServer(roomName)
     }
 
     //////// MESSAGING /////////
@@ -452,24 +463,28 @@ class Room(
         timerJob?.cancel()
         timerJob = GlobalScope.launch {
             gamePhaseStartTimeMillis = System.currentTimeMillis()
-            val gamePhaseChange = GamePhaseChange(
+            val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase,
                 startPhaseTimerMillis,
-                drawingPlayer?.playerName  // should use clientId? TODO probaly not...
+                drawingPlayer?.playerName
             )
 
             // Update the countdown timer
-            repeat( (startPhaseTimerMillis/ UPDATE_TIME_FREQUENCY_MILLIS).toInt() ) { count ->
+            repeat( (startPhaseTimerMillis / UPDATE_TIME_FREQUENCY_MILLIS).toInt() ) { count ->
                 if(count != 0) {
-                    gamePhaseChange.gamePhase = null
+                    // set to null bc we dont want to send a phase change, just update the timers.
+                    // null values are not serialized by gson
+                    gamePhaseUpdate.gamePhase = null
                 }
 
-                broadcast(gson.toJson(gamePhaseChange))
-                gamePhaseChange.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
+                println("count = $count, gamePhaseUpdate.gamePhase=${gamePhaseUpdate.gamePhase}")
+
+                broadcast(gson.toJson(gamePhaseUpdate))
+                gamePhaseUpdate.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
                 delay(UPDATE_TIME_FREQUENCY_MILLIS)
             }
 
-            // Update the game phase to the next one
+            // Update the gamePhase to the next state
             gamePhase = when(gamePhase) {
                 GamePhase.WAITING_FOR_START -> GamePhase.NEW_ROUND
                 GamePhase.ROUND_IN_PROGRESS -> GamePhase.ROUND_ENDED
@@ -481,6 +496,7 @@ class Room(
     }
 
     suspend fun broadcast(messageJson: String) {
+        println("messageJson: $messageJson")
         players.forEach {player ->
           if(player.socket.isActive) {
             player.socket.send(Frame.Text(messageJson))

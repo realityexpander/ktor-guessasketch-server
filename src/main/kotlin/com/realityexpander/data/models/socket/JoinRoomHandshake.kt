@@ -1,5 +1,6 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.common.ClientId
 import com.realityexpander.data.models.socket.SocketMessageType.TYPE_JOIN_ROOM_HANDSHAKE
 
 data class JoinRoomHandshake(

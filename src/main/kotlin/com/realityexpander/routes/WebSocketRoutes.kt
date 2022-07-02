@@ -18,6 +18,9 @@ fun Route.gameWebSocketRoute() {
     route("/ws/draw") {
         standardWebSocket { socket, clientId, messageJson, payload ->
             when(payload) {
+                is AddRoom -> {
+                    serverDB.addRoom(payload.roomName)
+                }
                 is JoinRoomHandshake -> {
                     val room = serverDB.rooms[payload.roomName]
 
