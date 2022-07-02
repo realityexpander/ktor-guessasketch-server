@@ -1,3 +1,3 @@
 package com.realityexpander.data.models.socket
 
-abstract class BaseSocketType(val type: String)
+abstract class BaseMessageType(val type: String)

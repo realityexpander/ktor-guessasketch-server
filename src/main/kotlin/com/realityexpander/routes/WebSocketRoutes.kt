@@ -73,7 +73,7 @@ fun Route.standardWebSocket(
         socket: DefaultWebSocketServerSession,  // connection of 1 client to server
         clientId: String, // clientId is a unique identifier for this player (client)
         messageJson: String,  // json message is the text sent by the client (json)
-        payload: BaseSocketType, // wrapper around message (unserialized from json `message`)
+        payload: BaseMessageType, // wrapper around message (unserialized from json `message`)
     ) -> Unit
 ) {
     webSocket {
@@ -87,31 +87,25 @@ fun Route.standardWebSocket(
         try {
             incoming.consumeEach { frame ->
                 if(frame is Frame.Text) {
-                    val messageJson = frame.readText()  // gets raw JSON
+                    // get the raw JSON message
+                    val messageJson = frame.readText()
+
+                    // Convert the messageJson to a JSON Object for easier handling
                     val jsonObject = JsonParser.parseString(messageJson).asJsonObject
 
-                    // Get the type of message
+                    // Extract the type of message
                     val typeStr = jsonObject["type"].asString
-                    val type = TypeHolder().socketTypes[typeStr]
+                        ?: println("Error: `type` field not found in $messageJson")
+
+                    // Convert `type` to a socket class to be used for gson deserialization
+                    val type = SocketMessageType.messageTypeMap[typeStr]
                         ?: let {
-                            println("Unknown socketType: $typeStr for $messageJson")
-                            BaseSocketType::class.java //throw IllegalArgumentException("Unknown message type")
+                            println("Error: Unknown socketType: $typeStr for $messageJson")
+                            BaseMessageType::class.java //throw IllegalArgumentException("Unknown message type")
                         }
 
-//                    // Get the type of message
-//                    val type = when(jsonObject.get("type").asString) {
-//                            TYPE_CHAT_MESSAGE -> ChatMessage::class.java
-//                            TYPE_DRAW_DATA -> DrawData::class.java
-//                            TYPE_ANNOUNCEMENT -> Announcement::class.java
-//                            TYPE_JOIN_ROOM_HANDSHAKE -> JoinRoomHandshake::class.java
-//                            TYPE_GAME_PHASE_CHANGE -> GamePhaseChange::class.java
-//                            TYPE_WORD_TO_GUESS -> WordToGuess::class.java
-//                            TYPE_GAME_STATE -> GameState::class.java
-//                            TYPE_PLAYERS_LIST -> PlayersList::class.java
-//                            else -> BaseSocketType::class.java   //throw IllegalArgumentException("Unknown message type")
-//                        }
-
-                    val payload = gson.fromJson(messageJson, type) // converts JSON to the type from the webSocket message
+                    // convert payload JSON string to the type from the webSocket message
+                    val payload = gson.fromJson(messageJson, type)
                     handleFrame(this, session.clientId, messageJson, payload)
                 }
             }

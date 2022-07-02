@@ -1,5 +1,7 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.data.models.socket.SocketMessageType.TYPE_DRAW_DATA
+
 data class DrawData(
     val roomName: String,
     val color: Int,
@@ -9,4 +11,4 @@ data class DrawData(
     val toX: Float,
     val toY: Float,
     val motionEvent: Int, // Move_touch_down, Move_touch_move, Move_touch_up
-): BaseSocketType(TYPE_DRAW_DATA)
+): BaseMessageType(TYPE_DRAW_DATA)

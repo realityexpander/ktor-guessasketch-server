@@ -1,5 +1,7 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.data.models.socket.SocketMessageType.TYPE_PLAYERS_LIST
+
 data class PlayersList(
     val players: List<PlayerData>
-): BaseSocketType("TYPE_PLAYERS_LIST")
+): BaseMessageType(TYPE_PLAYERS_LIST)

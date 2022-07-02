@@ -1,6 +1,8 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.data.models.socket.SocketMessageType.TYPE_GAME_STATE
+
 data class GameState(
     val drawingPlayer: String,
     val wordToGuess: String
-): BaseSocketType(TYPE_GAME_STATE)
+): BaseMessageType(TYPE_GAME_STATE)

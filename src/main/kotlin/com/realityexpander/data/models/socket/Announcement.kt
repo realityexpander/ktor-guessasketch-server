@@ -1,10 +1,12 @@
 package com.realityexpander.data.models.socket
 
+import com.realityexpander.data.models.socket.SocketMessageType.TYPE_ANNOUNCEMENT
+
 data class Announcement(
     val message: String,
     val timestamp:  Long,
     val announcementType: Int
-): BaseSocketType(TYPE_ANNOUNCEMENT) {
+): BaseMessageType(TYPE_ANNOUNCEMENT) {
 
     companion object {
         const val TYPE_PLAYER_GUESSED_CORRECTLY = 0
