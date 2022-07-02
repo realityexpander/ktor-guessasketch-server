@@ -346,7 +346,44 @@ class Room(
         playerName: String,
         socketSession: WebSocketSession
     ): Player {
-        val newPlayer = Player(playerName, socketSession, clientId)
+
+        // default to add the player at the end of the list of players
+        var indexToAddPlayerAt = players.size - 1
+
+        // check if this is a rejoining player
+        val newPlayer = if(exitingPlayers.containsKey(clientId)) {
+
+            val rejoiningPlayer = exitingPlayers[clientId]
+
+            rejoiningPlayer?.let { (rejoinedPlayer, indexOfPlayer) ->
+                rejoinedPlayer.socket = socketSession
+                rejoinedPlayer.isDrawing = drawingPlayer?.clientId == clientId  // is this the same as the drawing player?
+                indexToAddPlayerAt = indexOfPlayer
+
+                // Cancel and remove the "Remove Exiting Player After Delay" jobs
+                playerRemoveJobs[clientId]?.cancel()
+                playerRemoveJobs.remove(clientId)
+                exitingPlayers.remove(clientId)
+
+                rejoinedPlayer
+            } ?: Player(playerName, socketSession, clientId) // should never happen bc we checked
+        } else {
+            Player(playerName, socketSession, clientId)
+        }
+
+        // Check if the index to add the player at is in bounds.
+        //   (in case other players have also disconnected and the list is smaller than when the player joined.)
+        indexToAddPlayerAt = when {
+            players.isEmpty() -> 0
+            indexToAddPlayerAt >= players.size -> players.size - 1
+            else -> indexToAddPlayerAt
+        }
+
+        // Insert the new player at a particular index
+        val tmpPlayers = players.toMutableList()
+        tmpPlayers.add(indexToAddPlayerAt, newPlayer)
+        players = tmpPlayers.toList() // convert back to an immutable list
+
 
         // we use `x=x+y` instead of `x+=y`, because we want to
         //   use a copy of the immutable list to work in concurrent environments.
