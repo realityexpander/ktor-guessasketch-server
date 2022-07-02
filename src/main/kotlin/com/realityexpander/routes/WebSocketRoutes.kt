@@ -16,7 +16,12 @@ import kotlinx.coroutines.channels.consumeEach
 
 fun Route.gameWebSocketRoute() {
     route("/ws/draw") {
-        standardWebSocket { socket, clientId, messageJson, payload ->
+        standardWebSocket {
+                socket,
+                clientId,
+                messageJson,
+                payload ->
+
             when(payload) {
                 is AddRoom -> {
                     serverDB.addRoom(payload.roomName)
@@ -104,9 +109,9 @@ fun Route.standardWebSocket(
 
                     // Extract the type of message
                     val typeStr = jsonObject["type"].asString
-                        ?: println("Error: `type` field not found in $messageJson")
+                        ?: throw IllegalArgumentException("Error: 'type' field not found in $messageJson")
 
-                    // Convert `type` to a socket class to be used for gson deserialization
+                    // Convert "type" to a socket message class to be used for gson deserialization
                     val type = SocketMessageType.messageTypeMap[typeStr]
                         ?: let {
                             println("Error: Unknown socketType: $typeStr for $messageJson")

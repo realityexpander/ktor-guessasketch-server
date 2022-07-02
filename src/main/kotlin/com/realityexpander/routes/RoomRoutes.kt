@@ -89,6 +89,25 @@ fun Route.getRoomsRoute() {
                 return@get
             }
 
+            // For a blank query, return all rooms
+            if(searchQuery == "") {
+                val roomResponses = serverDB.roomsDB
+                    .values.toList()
+                    .map { room ->
+                        RoomResponse(room.roomName, room.maxPlayers, room.players.size)
+                    }
+
+                call.respond(HttpStatusCode.OK,
+                    BasicApiResponseWithData(
+                        true,
+                        "Rooms retrieved",
+                        roomResponses
+                    )
+                )
+
+                return@get
+            }
+
             // find rooms matching name
             val roomsResult = serverDB.roomsDB.filterKeys { roomName ->
                 roomName.contains(searchQuery, ignoreCase = true)
