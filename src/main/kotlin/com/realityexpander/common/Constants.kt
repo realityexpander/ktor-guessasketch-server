@@ -10,5 +10,4 @@ object Constants {
     const val SCORE_GUESS_CORRECT_MULTIPLIER = 50
     const val SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT = 50
 
-    // Game
 }

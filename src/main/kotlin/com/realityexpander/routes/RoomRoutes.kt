@@ -154,7 +154,7 @@ fun Route.joinRoomRoute() {
             }
 
             // check if player already exists in the room
-            if(room.containsPlayer(playerName)) {
+            if(room.containsPlayerName(playerName)) {
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponse(
                         false,

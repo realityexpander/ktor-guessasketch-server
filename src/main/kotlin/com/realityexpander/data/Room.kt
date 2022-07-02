@@ -5,7 +5,7 @@ import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
 import com.realityexpander.common.getRandomWords
-import com.realityexpander.common.matchesWord
+import com.realityexpander.common.containsWord
 import com.realityexpander.common.transformToUnderscores
 import com.realityexpander.common.words
 import com.realityexpander.data.models.socket.*
@@ -210,9 +210,9 @@ class Room(
     // Check chat message for correct guess and also that the guess is *not* from a
     //   winning player (ie: no cheating for entering the word multiple times!)
     fun isGuessCorrect(guessChatMessage: ChatMessage): Boolean {
-        return guessChatMessage.matchesWord(wordToGuess ?: return false)
-                && !winningPlayers.contains(guessChatMessage.fromPlayer)
-                && guessChatMessage.fromPlayer.clientId != drawingPlayer?.clientId
+        return guessChatMessage.containsWord(wordToGuess ?: return false)
+                && !winningPlayers.containsPlayerClientId(guessChatMessage.fromPlayerClientId)
+                && guessChatMessage.fromPlayerClientId != drawingPlayer?.clientId
                 && gamePhase == GamePhase.ROUND_IN_PROGRESS
     }
 
@@ -231,29 +231,33 @@ class Room(
     // Returns true if the player has guessed the word
     suspend fun checkWordThenScoreAndNotifyPlayers(message: ChatMessage): Boolean {
         if(isGuessCorrect(message)) {
-            val winningPlayer = message.fromPlayer
+            val winningPlayer = getPlayerByPlayerClientId(message.fromPlayerClientId) ?: return false
+
+            // Calc score for winning player
             val guessTimeMillis = System.currentTimeMillis() - gamePhaseStartTimeMillis
             val percentTimeLeft = 1f -
                     (guessTimeMillis / DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS.toFloat())
             val score = SCORE_GUESS_CORRECT_DEFAULT +
                     (SCORE_GUESS_CORRECT_MULTIPLIER * percentTimeLeft).toInt()
-
             winningPlayer.score += score
 
+            // Calc score for the drawingPlayer
             drawingPlayer?.let {player ->
                 player.score += SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT / players.size
             }
 
-            val announcement = Announcement(
+            // Tell other players a winner has occurred
+            var announcement = Announcement(
                 message = "${winningPlayer.playerName} guessed the word correctly!",
                 timestamp = System.currentTimeMillis(),
                 Announcement.TYPE_PLAYER_GUESSED_CORRECTLY
             )
             broadcast(gson.toJson(announcement))
 
+            // Check if the round is completed (true if everyone guessed it)
             val isRoundOver = addWinningPlayer(winningPlayer)
             if (isRoundOver) {
-                val announcement = Announcement(
+                announcement = Announcement(
                     message = "EVERYBODY GUESSED IT! Round over! New round starting...",
                     timestamp = System.currentTimeMillis(),
                     Announcement.TYPE_EVERYBODY_GUESSED_CORRECTLY
@@ -266,6 +270,37 @@ class Room(
 
         return false
 
+    }
+
+
+    // When a player joins a room (connect or reconnects)
+    // Inform the player of the word to guess and the current phase
+    suspend fun sendWordToPlayer(player: Player) {
+        val delay = when(gamePhase) {
+            GamePhase.WAITING_FOR_START -> DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
+            GamePhase.NEW_ROUND -> DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS
+            GamePhase.ROUND_IN_PROGRESS -> DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
+            GamePhase.ROUND_ENDED -> DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
+            else -> 0L
+        }
+
+        val gamePhaseChange = GamePhaseChange(gamePhase, delay, drawingPlayer?.playerName)
+        wordToGuess?.let {curWordToGuess ->
+            drawingPlayer?.let { drawingPlayer ->
+                val gameState = GameState(
+                    drawingPlayer.playerName,
+                    if(player.isDrawing || gamePhase == GamePhase.ROUND_ENDED) {
+                        curWordToGuess
+                    } else {
+                        curWordToGuess.transformToUnderscores()
+                    }
+                )
+
+                sendToOnePlayer(gson.toJson(gameState), player)
+            }
+        }
+
+        sendToOnePlayer(gson.toJson(gamePhaseChange), player)
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -371,8 +406,16 @@ class Room(
 
     //////// UTILITIES /////////
 
-    fun containsPlayer(playerName: String): Boolean {
+    fun containsPlayerName(playerName: String): Boolean {
         return players.find { it.playerName == playerName } != null
+    }
+
+    fun List<Player>.containsPlayerClientId(playerClientId: String): Boolean {
+        return find { it.clientId == playerClientId } != null
+    }
+
+    fun getPlayerByPlayerClientId(playerClientId: String): Player? {
+        return players.find { it.clientId == playerClientId }
     }
 }
 

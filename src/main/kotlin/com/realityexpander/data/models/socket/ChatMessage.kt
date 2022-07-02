@@ -4,7 +4,8 @@ import com.realityexpander.data.Player
 import com.realityexpander.data.models.socket.TypeConstants.TYPE_CHAT_MESSAGE
 
 data class ChatMessage(
-    val fromPlayer: Player,  // change to sender clientId? Todo
+    val fromPlayerClientId: String,
+    val fromPlayerName: String,
     val roomName: String,
     val message: String,
     val timestamp: Long

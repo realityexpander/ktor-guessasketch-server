@@ -43,7 +43,7 @@ fun Route.gameWebSocketRoute() {
 
                     // Add player to room
                     serverDB.playerJoined(newPlayer)
-                    if(!room.containsPlayer(newPlayer.playerName)) {
+                    if(!room.containsPlayerName(newPlayer.playerName)) {
                         room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
                     }
                 }
@@ -60,7 +60,12 @@ fun Route.gameWebSocketRoute() {
                     room.setWordToGuessAndStartRound(payload.wordToGuess)
                 }
                 is ChatMessage -> {
+                    val room = serverDB.rooms[payload.roomName] ?: return@standardWebSocket
 
+                    // Does this message text contain the correct guess for the word?
+                    if(!room.checkWordThenScoreAndNotifyPlayers(payload)) {
+                        room.broadcast(messageJson)
+                    }
                 }
                 else -> {
 
