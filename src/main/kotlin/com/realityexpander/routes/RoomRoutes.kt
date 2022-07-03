@@ -141,7 +141,7 @@ fun Route.joinRoomRoute() {
                 call.respond(HttpStatusCode.BadRequest,
                     BasicApiResponse(
                         false,
-                        "No room name or player name provided" )
+                        "No room name and/or player name provided" )
                 )
 
                 return@get
@@ -184,12 +184,12 @@ fun Route.joinRoomRoute() {
             }
 
             // add player to room
-            // room.players += Player(playerName, )  // TODO: add player to room
+            // room.players += Player(playerName, )  // TODO: add player to room here, or in ws?
 
             call.respond(HttpStatusCode.OK,
                 BasicApiResponse(
                     true,
-                    "Player added to room" )
+                    "Player can be added to room" )
             )
         }
     }
