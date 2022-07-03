@@ -55,7 +55,7 @@ class Room(
 
     // Track drawing data
     private var curRoundDrawData: List<String> = listOf()
-    var lastDrawData: DrawData? = null
+    var lastDrawData: DrawData? = null  // prevent bug where the player is touch_down and the round has ended before the touch_up
 
     ////// GAME STATE MACHINE ///////
 
@@ -103,7 +103,7 @@ class Room(
 
     private fun waitingForStartPhase(){
         GlobalScope.launch {
-            startGamePhaseCountdownTimerAndNotify(
+            startGamePhaseCountdownTimerAndNotifyPlayers(
                 DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             )
 
@@ -123,7 +123,7 @@ class Room(
         proceedToNextDrawingPlayer()
         GlobalScope.launch {
             sendToOnePlayer(gson.toJson(newWordsToGuess), drawingPlayer)
-            startGamePhaseCountdownTimerAndNotify(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
+            startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
             broadcastAllPlayersData()
         }
     }
@@ -155,7 +155,7 @@ class Room(
             sendToOnePlayer(gson.toJson(gameStateForDrawingPlayer), drawingPlayer)
         }
 
-        startGamePhaseCountdownTimerAndNotify(
+        startGamePhaseCountdownTimerAndNotifyPlayers(
             DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
         )
 
@@ -190,7 +190,7 @@ class Room(
                 broadcast(gson.toJson(word))
             }
 
-            startGamePhaseCountdownTimerAndNotify(DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS)
+            startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS)
             val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase = GamePhase.ROUND_ENDED,
                 DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
@@ -340,10 +340,83 @@ class Room(
         broadcast(gson.toJson(PlayersList(playersList)))
     }
 
+
+    //////  GAME PHASE TIMERS & NOTIFICATIONS //////
+
+    // 1. Set and Start the phase countdown timer
+    // 2. Notify the players that the phase has started
+    // 3. Wait for the phase to end
+    // 4. Notify the players that the phase has ended
+    // 5. Proceed to the next phase of the game
+    // timeAndNotify  todo remove at end
+    private fun startGamePhaseCountdownTimerAndNotifyPlayers(startPhaseTimerMillis: Long) {
+
+        timerJob?.cancel()
+        timerJob = GlobalScope.launch {
+
+            // Set and Start the game phase countdown timer
+            gamePhaseStartTimeMillis = System.currentTimeMillis()
+            val gamePhaseUpdate = GamePhaseUpdate(
+                gamePhase,
+                startPhaseTimerMillis,
+                drawingPlayer?.playerName
+            )
+
+            // Notify the players that the phase has started
+            broadcast(gson.toJson(gamePhaseUpdate))
+
+            // Send players the current countdown time
+            repeat( (startPhaseTimerMillis / UPDATE_TIME_FREQUENCY_MILLIS).toInt() ) { count ->
+
+                // Notify the players of the current countdown time for this game phase
+                if(count != 0) {
+                    // After the phase has started, set the `gamePhase` field to null bc
+                    //   we don't want to send a phase change, just update the time.
+                    //   (note: null values are not serialized by gson)
+                    gamePhaseUpdate.gamePhase = null
+
+                    broadcast(gson.toJson(gamePhaseUpdate))
+                }
+
+                println("count = $count, gamePhaseUpdate.gamePhase=${gamePhaseUpdate.gamePhase}")
+
+                // Decrement the countdown time
+                gamePhaseUpdate.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
+                delay(UPDATE_TIME_FREQUENCY_MILLIS)
+            }
+
+            // Go to the next phase of the game
+            proceedToNextGamePhase()
+        }
+    }
+
+    private suspend fun proceedToNextGamePhase() {
+        gamePhase = when (gamePhase) {
+            GamePhase.WAITING_FOR_START ->
+                GamePhase.NEW_ROUND
+            GamePhase.ROUND_IN_PROGRESS -> {
+                finishOffDrawing()  // make sure the drawing is finished
+                GamePhase.ROUND_ENDED
+            }
+            GamePhase.ROUND_ENDED ->
+                GamePhase.NEW_ROUND
+            GamePhase.NEW_ROUND -> {
+                wordToGuess = null  // reset the word to guess to force a new word to be picked
+                GamePhase.ROUND_IN_PROGRESS
+            }
+            else ->
+                GamePhase.WAITING_FOR_PLAYERS
+        }
+    }
+
+
+    ////// DRAWING ///////
+
+    // Finish off the drawing
     private suspend fun finishOffDrawing() {
         lastDrawData?.let { drawData ->
-            if(curRoundDrawData.isNotEmpty() && drawData.motionEvent == 2) {
-                val finishDrawData = drawData.copy(motionEvent = 1)
+            if(curRoundDrawData.isNotEmpty() && drawData.motionEvent == DRAW_MOTION_EVENT_ACTION_MOVE) {
+                val finishDrawData = drawData.copy(motionEvent = DRAW_MOTION_EVENT_ACTION_UP)
                 broadcast(gson.toJson(finishDrawData))
             }
         }
@@ -355,11 +428,14 @@ class Room(
         curRoundDrawData = curRoundDrawData + drawActionJson
     }
 
+    // Send the serialized drawing data to all the players
     private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
         if(gamePhase == GamePhase.ROUND_IN_PROGRESS || gamePhase == GamePhase.ROUND_ENDED) {
             sendToOnePlayer(gson.toJson(curRoundDrawData), player)
         }
     }
+
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -524,43 +600,6 @@ class Room(
     }
 
     //////// MESSAGING /////////
-
-    // timeAndNotify
-    private fun startGamePhaseCountdownTimerAndNotify(startPhaseTimerMillis: Long) {
-        timerJob?.cancel()
-        timerJob = GlobalScope.launch {
-            gamePhaseStartTimeMillis = System.currentTimeMillis()
-            val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase,
-                startPhaseTimerMillis,
-                drawingPlayer?.playerName
-            )
-
-            // Update the countdown timer
-            repeat( (startPhaseTimerMillis / UPDATE_TIME_FREQUENCY_MILLIS).toInt() ) { count ->
-                if(count != 0) {
-                    // set to null bc we dont want to send a phase change, just update the timers.
-                    // null values are not serialized by gson
-                    gamePhaseUpdate.gamePhase = null
-                }
-
-                println("count = $count, gamePhaseUpdate.gamePhase=${gamePhaseUpdate.gamePhase}")
-
-                broadcast(gson.toJson(gamePhaseUpdate))
-                gamePhaseUpdate.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
-                delay(UPDATE_TIME_FREQUENCY_MILLIS)
-            }
-
-            // Update the gamePhase to the next state
-            gamePhase = when(gamePhase) {
-                GamePhase.WAITING_FOR_START -> GamePhase.NEW_ROUND
-                GamePhase.ROUND_IN_PROGRESS -> GamePhase.ROUND_ENDED
-                GamePhase.ROUND_ENDED -> GamePhase.NEW_ROUND
-                GamePhase.NEW_ROUND -> GamePhase.ROUND_IN_PROGRESS
-                else -> GamePhase.WAITING_FOR_PLAYERS
-            }
-        }
-    }
 
     suspend fun broadcast(messageJson: String) {
         println("messageJson: $messageJson")

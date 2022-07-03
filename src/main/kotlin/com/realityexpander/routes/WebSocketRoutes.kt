@@ -53,6 +53,7 @@ fun Route.gameWebSocketRoute() {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                         room.addSerializedDrawActionJson(messageJson)
                     }
+                    room.lastDrawData = payload // used to finishOffDrawing
                 }
                 is DrawAction -> {
                     val room = serverDB.getRoomContainsClientId(clientId) ?: return@standardWebSocket
