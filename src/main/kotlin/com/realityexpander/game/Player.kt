@@ -1,4 +1,4 @@
-package com.realityexpander.data
+package com.realityexpander.game
 
 import com.realityexpander.common.ClientId
 import com.realityexpander.common.Constants.PING_FREQUENCY

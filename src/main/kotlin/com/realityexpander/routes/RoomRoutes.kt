@@ -1,11 +1,11 @@
 package com.realityexpander.routes
 
 import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
-import com.realityexpander.data.Room
+import com.realityexpander.game.Room
 import com.realityexpander.data.models.response.BasicApiResponse
 import com.realityexpander.data.models.response.BasicApiResponseWithData
 import com.realityexpander.data.models.request.CreateRoomRequest
-import com.realityexpander.data.models.response.RoomResponse
+import com.realityexpander.data.models.response.RoomDTO
 import com.realityexpander.serverDB
 import io.ktor.application.*
 import io.ktor.http.*
@@ -91,17 +91,17 @@ fun Route.getRoomsRoute() {
 
             // For a blank query, return all rooms
             if(searchQuery == "") {
-                val roomResponses = serverDB.roomsDB
+                val rooms = serverDB.roomsDB
                     .values.toList()
                     .map { room ->
-                        RoomResponse(room.roomName, room.maxPlayers, room.players.size)
+                        RoomDTO(room.roomName, room.maxPlayers, room.players.size)
                     }
 
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponseWithData(
                         true,
                         "Rooms retrieved",
-                        roomResponses
+                        rooms
                     )
                 )
 
@@ -114,8 +114,8 @@ fun Route.getRoomsRoute() {
             }
 
             // collect data for response
-            val roomResponses = roomsResult.values.map {room ->
-                RoomResponse(room.roomName, room.maxPlayers, room.players.size)
+            val rooms = roomsResult.values.map { room ->
+                RoomDTO(room.roomName, room.maxPlayers, room.players.size)
             }.sortedBy {  room ->
                 room.roomName
             }
@@ -124,7 +124,7 @@ fun Route.getRoomsRoute() {
                 BasicApiResponseWithData(
                     true,
                     "Rooms retrieved",
-                    roomResponses
+                    rooms
                 )
             )
         }

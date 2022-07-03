@@ -1,4 +1,4 @@
-package com.realityexpander.data
+package com.realityexpander.game
 
 import com.realityexpander.common.*
 import com.realityexpander.common.Constants.PLAYER_REMOVE_DELAY_MILLIS
@@ -6,6 +6,7 @@ import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
+import com.realityexpander.data.ExitingPlayer
 import com.realityexpander.data.models.socket.*
 import com.realityexpander.data.models.socket.Announcement.Companion.TYPE_PLAYER_EXITED_ROOM
 import com.realityexpander.gson

@@ -2,8 +2,8 @@ package com.realityexpander.routes
 
 import com.google.gson.JsonParser
 import com.realityexpander.common.ClientId
-import com.realityexpander.data.Player
-import com.realityexpander.data.Room
+import com.realityexpander.game.Player
+import com.realityexpander.game.Room
 import com.realityexpander.data.models.socket.*
 import com.realityexpander.gson
 import com.realityexpander.serverDB
@@ -56,7 +56,7 @@ fun Route.gameWebSocketRoute() {
                     room.lastDrawData = payload // used to finishOffDrawing
                 }
                 is DrawAction -> {
-                    val room = serverDB.getRoomContainsClientId(clientId) ?: return@standardWebSocket
+                    val room = serverDB.getRoomForPlayerClientId(clientId) ?: return@standardWebSocket
                     room.broadcastToAllExceptOneClientId(messageJson, clientId)
 
                     // Just need to save the json strings, no need to parse it again as it
@@ -140,7 +140,7 @@ fun Route.standardWebSocket(
             // HANDLE DISCONNECTS
 
             // Find the player that disconnected
-            val player = serverDB.getRoomContainsClientId(session.clientId)
+            val player = serverDB.getRoomForPlayerClientId(session.clientId)
                 ?.players
                 ?.find { player ->
                     player.clientId == session.clientId

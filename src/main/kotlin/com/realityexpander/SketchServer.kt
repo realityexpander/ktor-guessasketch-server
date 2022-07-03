@@ -3,8 +3,8 @@ package com.realityexpander
 import com.realityexpander.common.ClientId
 import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
 import com.realityexpander.common.RoomName
-import com.realityexpander.data.Player
-import com.realityexpander.data.Room
+import com.realityexpander.game.Player
+import com.realityexpander.game.Room
 import io.ktor.websocket.*
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -47,7 +47,7 @@ class SketchServer {  // DrawingServer todo remove at end
     // playerLeft // todo remove at end
     fun removePlayerFromRoom(removeClientId: ClientId, isImmediateDisconnect: Boolean = false) {
         // Find the room for the player
-        val roomOfPlayer = getRoomContainsClientId(removeClientId)
+        val roomOfPlayer = getRoomForPlayerClientId(removeClientId)
 
         if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline == false) {
             println("Now Closing connection to ${playersDB[removeClientId]}")
@@ -68,7 +68,7 @@ class SketchServer {  // DrawingServer todo remove at end
         roomsDB -= removeRoomName
     }
 
-    fun getRoomContainsClientId(clientId: ClientId): Room? {
+    fun getRoomForPlayerClientId(clientId: ClientId): Room? {
         return roomsDB.values.firstOrNull { room ->
             room.players.find{ player ->
                 player.clientId == clientId
