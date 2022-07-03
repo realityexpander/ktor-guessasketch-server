@@ -18,6 +18,8 @@ object SocketMessageType {
     const val TYPE_PLAYERS_LIST        = "TYPE_PLAYERS_LIST" // contains list of player data (score, rank, etc)
     const val TYPE_PING                = "TYPE_PING"
     const val TYPE_DISCONNECT_REQUEST  = "TYPE_DISCONNECT_REQUEST"
+    const val TYPE_DRAW_ACTION         = "TYPE_DRAW_ACTION"
+    const val TYPE_CUR_ROUND_DRAW_DATA = "TYPE_CUR_ROUND_DRAW_DATA"
 
     val messageTypeMap: MutableMap<String, Class<out BaseMessageType>> = mutableMapOf()
 
@@ -34,6 +36,8 @@ object SocketMessageType {
         messageTypeMap[TYPE_PLAYERS_LIST]        = PlayersList::class.java
         messageTypeMap[TYPE_PING]                = Ping::class.java
         messageTypeMap[TYPE_DISCONNECT_REQUEST]  = DisconnectRequest::class.java
+        messageTypeMap[TYPE_DRAW_ACTION]         = DrawAction::class.java
+        messageTypeMap[TYPE_CUR_ROUND_DRAW_DATA] = CurRoundDrawData::class.java
     }
 
     fun getMessageTypeStringForMessageTypeClass(messageTypeClass: Class<out BaseMessageType>): String? {

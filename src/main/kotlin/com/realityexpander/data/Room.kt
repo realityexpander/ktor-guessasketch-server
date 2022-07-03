@@ -53,6 +53,9 @@ class Room(
     private var playerRemoveJobs = ConcurrentHashMap<ClientId, Job>()
     private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()  // leftPlayers todo remove
 
+    // Track drawing data
+    private var curRoundDrawData: List<String> = listOf()
+    var lastDrawData: DrawData? = null
 
     ////// GAME STATE MACHINE ///////
 
@@ -113,6 +116,7 @@ class Room(
     }
 
     private fun newRoundPhase() {  // newRound // todo remove at end
+        curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
         val newWordsToGuess = NewWords(curWords!!)
 
@@ -336,6 +340,27 @@ class Room(
         broadcast(gson.toJson(PlayersList(playersList)))
     }
 
+    private suspend fun finishOffDrawing() {
+        lastDrawData?.let { drawData ->
+            if(curRoundDrawData.isNotEmpty() && drawData.motionEvent == 2) {
+                val finishDrawData = drawData.copy(motionEvent = 1)
+                broadcast(gson.toJson(finishDrawData))
+            }
+        }
+    }
+
+    // Collect the serialized drawing data to be able to send it to all the players
+    //  (so they can recreate the drawing)
+    fun addSerializedDrawActionJson(drawActionJson: String) {
+        curRoundDrawData = curRoundDrawData + drawActionJson
+    }
+
+    private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
+        if(gamePhase == GamePhase.ROUND_IN_PROGRESS || gamePhase == GamePhase.ROUND_ENDED) {
+            sendToOnePlayer(gson.toJson(curRoundDrawData), player)
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -417,6 +442,9 @@ class Room(
 
         // Send the all current players' data to all players
         broadcastAllPlayersData()
+
+        // Send the drawing data to the new player
+        sendCurRoundDrawDataToPlayer(newPlayer)
 
         return newPlayer
     }

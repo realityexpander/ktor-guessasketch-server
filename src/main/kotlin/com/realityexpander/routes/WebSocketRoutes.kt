@@ -51,7 +51,16 @@ fun Route.gameWebSocketRoute() {
 
                     if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
+                        room.addSerializedDrawActionJson(messageJson)
                     }
+                }
+                is DrawAction -> {
+                    val room = serverDB.getRoomContainsClientId(clientId) ?: return@standardWebSocket
+                    room.broadcastToAllExceptOneClientId(messageJson, clientId)
+
+                    // Just need to save the json strings, no need to parse it again as it
+                    //   will just be sent again to the client.
+                    room.addSerializedDrawActionJson(messageJson)
                 }
                 is SetWordToGuess -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
