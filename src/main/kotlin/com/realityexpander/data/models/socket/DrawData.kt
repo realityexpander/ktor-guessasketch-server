@@ -2,8 +2,6 @@ package com.realityexpander.data.models.socket
 
 import com.realityexpander.data.models.socket.SocketMessageType.TYPE_DRAW_DATA
 
-
-
 data class DrawData(
     val roomName: String,
     val color: Int,
