@@ -1,7 +1,7 @@
 package com.realityexpander.game
 
 import com.realityexpander.common.*
-import com.realityexpander.common.Constants.PLAYER_REMOVE_DELAY_MILLIS
+import com.realityexpander.common.Constants.PLAYER_EXIT_REMOVE_DELAY_MILLIS
 import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
@@ -547,11 +547,11 @@ class Room(
 
             // Add player to exiting list
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
-            //players = players - player // phillip mistake? todo
+            //players = players - player // phillip mistake? todo remove at end
 
-            // Launch the "final" remove player job that will happen in PLAYER_REMOVE_DELAY_MILLIS from now.
+            // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_DELAY_MILLIS from now.
             playerRemoveJobs[removeClientId] = GlobalScope.launch {
-                delay(PLAYER_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
+                delay(PLAYER_EXIT_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
 
                 val removePlayer = exitingPlayers[removeClientId]
 
@@ -598,6 +598,11 @@ class Room(
             broadcast(gson.toJson(announcement))
             broadcastAllPlayersData()
         }
+    }
+
+    fun cancelRemovePlayerJob(clientId: ClientId) {
+        playerRemoveJobs[clientId]?.cancel()
+        playerRemoveJobs -= clientId
     }
 
     private fun killRoom() {

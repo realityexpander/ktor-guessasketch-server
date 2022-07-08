@@ -3,7 +3,7 @@ package com.realityexpander.common
 object Constants {
     const val ROOM_MAX_NUM_PLAYERS = 8
 
-    const val PLAYER_REMOVE_DELAY_MILLIS = 60000L // Amount of wait time until player is finally removed.
+    const val PLAYER_EXIT_REMOVE_DELAY_MILLIS = 60000L // Amount of wait time until player is finally removed.
 
     // Scoring
     const val SCORE_PER_SECOND = 1

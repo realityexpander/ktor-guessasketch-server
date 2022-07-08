@@ -29,17 +29,20 @@ class SketchServer {  // DrawingServer todo remove at end
 
             // Add player to room
             if (!room.containsPlayerClientId(newPlayer.clientId)) {
-                // XXX IGNORE XXXXX Room does not have this player yet, add it XXXXXX  ??? todo remove at end
-                // NOTE: player is first added by the JoinRoomHandshake socket message, not this method! ??? todo remove at end
                 room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
+                newPlayer.startPinging()
             } else {
-                // player has quickly disconnected then reconnected, so just update the socket
+                // Player has disconnected then quickly reconnected,
+                //   so just update the socket
+                //   and remove the "player exit" job.
                 val playerInRoom = room.getPlayerByClientId(newPlayer.clientId)
-                playerInRoom?.socket = socket  // update the socket
-                playerInRoom?.startPinging()
-            }
 
-            newPlayer.startPinging()
+                playerInRoom?.let { player ->
+                    room.cancelRemovePlayerJob(player.clientId)
+                    playerInRoom.socket = socket  // update the socket of the new connection
+                    playerInRoom.startPinging()
+                }
+            }
 
             println("roomsDB=$roomsDB, playersDB=$playersDB")
         }
