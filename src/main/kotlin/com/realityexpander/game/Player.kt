@@ -1,7 +1,7 @@
 package com.realityexpander.game
 
 import com.realityexpander.common.ClientId
-import com.realityexpander.common.Constants.PING_FREQUENCY
+import com.realityexpander.common.Constants.PING_TIMEOUT_LIMIT
 import com.realityexpander.data.models.socket.Ping
 import com.realityexpander.gson
 import com.realityexpander.serverDB
@@ -32,7 +32,7 @@ data class Player(
         pingJob = GlobalScope.launch {
             while(true) {
                 sendPing()
-                delay(PING_FREQUENCY)
+                delay(PING_TIMEOUT_LIMIT)
             }
         }
     }
@@ -41,9 +41,9 @@ data class Player(
         pingTimeMillis = System.currentTimeMillis()
         socket.send(Frame.Text(gson.toJson(Ping())))
 
-        delay(PING_FREQUENCY)  // wait for response
+        delay(PING_TIMEOUT_LIMIT)  // wait for response
 
-        if(pingTimeMillis - pongTimeMillis > PING_FREQUENCY) {
+        if(pingTimeMillis - pongTimeMillis > PING_TIMEOUT_LIMIT) {
             isOnline = false
             serverDB.removePlayerFromRoom(clientId)
             pingJob?.cancel()

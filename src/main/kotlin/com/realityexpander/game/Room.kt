@@ -8,7 +8,9 @@ import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
 import com.realityexpander.data.ExitingPlayer
 import com.realityexpander.data.models.socket.*
-import com.realityexpander.data.models.socket.Announcement.Companion.TYPE_PLAYER_EXITED_ROOM
+import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_PLAYER_EXITED_ROOM
+import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_DOWN
+import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_UP
 import com.realityexpander.gson
 import com.realityexpander.serverDB
 import io.ktor.http.cio.websocket.*
@@ -61,6 +63,8 @@ class Room(
     ////// GAME STATE MACHINE ///////
 
     init {
+
+        // commented for testing.... remove later todo
         // When the gamePhase is set, this listener calls the appropriate func
         setGamePhaseChangeListener { newGamePhase ->
             when(newGamePhase) {
@@ -70,6 +74,7 @@ class Room(
                 GamePhase.NEW_ROUND -> newRoundPhase()
                 GamePhase.ROUND_IN_PROGRESS -> roundInProgressPhase()
                 GamePhase.ROUND_ENDED -> roundEndedPhase()
+                else -> {}
             }
         }
     }
@@ -268,7 +273,7 @@ class Room(
             var announcement = Announcement(
                 message = "${winningPlayer.playerName} guessed the word correctly!",
                 timestamp = System.currentTimeMillis(),
-                Announcement.TYPE_PLAYER_GUESSED_CORRECTLY
+                Announcement.ANNOUNCEMENT_PLAYER_GUESSED_CORRECTLY
             )
             broadcast(gson.toJson(announcement))
 
@@ -278,7 +283,7 @@ class Room(
                 announcement = Announcement(
                     message = "EVERYBODY GUESSED IT! Round over! New round starting...",
                     timestamp = System.currentTimeMillis(),
-                    Announcement.TYPE_EVERYBODY_GUESSED_CORRECTLY
+                    Announcement.ANNOUNCEMENT_EVERYBODY_GUESSED_CORRECTLY
                 )
                 broadcast(gson.toJson(announcement))
             }
@@ -379,8 +384,6 @@ class Room(
                     broadcast(gson.toJson(gamePhaseUpdate))
                 }
 
-                println("count = $count, gamePhaseUpdate.gamePhase=${gamePhaseUpdate.gamePhase}")
-
                 // Decrement the countdown time
                 gamePhaseUpdate.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
                 delay(UPDATE_TIME_FREQUENCY_MILLIS)
@@ -416,8 +419,8 @@ class Room(
     // Finish off the drawing
     private suspend fun finishOffDrawing() {
         lastDrawData?.let { drawData ->
-            if(curRoundDrawData.isNotEmpty() && drawData.motionEvent == DRAW_MOTION_EVENT_ACTION_MOVE) {
-                val finishDrawData = drawData.copy(motionEvent = DRAW_MOTION_EVENT_ACTION_UP)
+            if(curRoundDrawData.isNotEmpty() && drawData.motionEvent == DRAW_DATA_MOTION_EVENT_ACTION_DOWN) {
+                val finishDrawData = drawData.copy(motionEvent = DRAW_DATA_MOTION_EVENT_ACTION_UP)
                 broadcast(gson.toJson(finishDrawData))
             }
         }
@@ -425,8 +428,8 @@ class Room(
 
     // Collect the serialized drawing data to be able to send it to all the players
     //  (so they can recreate the drawing)
-    fun addSerializedDrawActionJson(drawActionJson: String) {
-        curRoundDrawData = curRoundDrawData + drawActionJson
+    fun addSerializedDrawDataJson(drawDataJson: String) {
+        curRoundDrawData = curRoundDrawData + drawDataJson
     }
 
     // Send the serialized drawing data to all the players
@@ -449,14 +452,15 @@ class Room(
         socketSession: WebSocketSession
     ): Player {
 
-        // default to add the player at the end of the list of players
+        // Default behavior is to add the player at the end of the list of players
         var indexToAddPlayerAt = players.size - 1
 
-        // check if this is a rejoining player
+        // Check if this is a rejoining player
         val newPlayer = if(exitingPlayers.containsKey(clientId)) {
 
             val rejoiningPlayer = exitingPlayers[clientId]
 
+            // If the player is rejoining, remove it from the exitingPlayers map
             rejoiningPlayer?.let { (rejoinedPlayer, indexOfPlayer) ->
                 rejoinedPlayer.socket = socketSession
                 rejoinedPlayer.isDrawing = drawingPlayer?.clientId == clientId  // is this the same as the drawing player?
@@ -468,28 +472,30 @@ class Room(
                 exitingPlayers.remove(clientId)
 
                 rejoinedPlayer
-            } ?: Player(playerName, socketSession, clientId) // should never happen bc we checked
+            } ?: Player(playerName, socketSession, clientId) // should never get here bc we checked
         } else {
+            // This is a new player
             Player(playerName, socketSession, clientId)
         }
 
-        // Check if the index to add the player at is in bounds.
+        // Check if the index where to add the player is in bounds.
         //   (in case other players have also disconnected and the list is smaller than when the player joined.)
-        indexToAddPlayerAt = when {
-            players.isEmpty() -> 0
-            indexToAddPlayerAt >= players.size -> players.size - 1
-            else -> indexToAddPlayerAt
-        }
+        indexToAddPlayerAt =
+            when {
+                players.isEmpty()                   -> 0
+                indexToAddPlayerAt >= players.size  -> players.size - 1
+                else                                -> indexToAddPlayerAt
+            }
 
-        // Insert the new player at a particular index
+        // Insert the new player at the particular index
         val tmpPlayers = players.toMutableList()
         tmpPlayers.add(indexToAddPlayerAt, newPlayer)
+
+        // we use `x = x + y` instead of `x+=y`, because we want to
+        //   use a copy of the immutable list to work in concurrent environments.
         players = tmpPlayers.toList() // convert back to an immutable list
 
 
-        // we use `x=x+y` instead of `x+=y`, because we want to
-        //   use a copy of the immutable list to work in concurrent environments.
-        players = players + newPlayer
 
         // Only player in the room?  -> keep waiting for more players
         if (players.size == ONE_PLAYER) {
@@ -513,7 +519,7 @@ class Room(
         // Send announcement to all players
         val announcement = Announcement( "Player $playerName has joined the game",
             System.currentTimeMillis(),
-            Announcement.TYPE_PLAYER_JOINED
+            Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
         )
         broadcast(gson.toJson(announcement))
 
@@ -579,14 +585,14 @@ class Room(
             players = players - playerToRemove
 
             // Remove the player from the server
-            serverDB.removePlayerFromServer(removeClientId)
+            serverDB.removePlayerFromServerDB(removeClientId)
         }
 
         // Tell all players that a player left
         val announcement = Announcement(
             message = "Player ${playerToRemove.playerName} has left the room.",
             timestamp = System.currentTimeMillis(),
-            announcementType = TYPE_PLAYER_EXITED_ROOM
+            announcementType = ANNOUNCEMENT_PLAYER_EXITED_ROOM
         )
         GlobalScope.launch {
             broadcast(gson.toJson(announcement))
@@ -597,32 +603,40 @@ class Room(
     private fun killRoom() {
         playerRemoveJobs.values.forEach { it.cancel() }
         timerJob?.cancel()
-        serverDB.removeRoomFromServer(roomName)
+        serverDB.removeRoomFromServerDB(roomName)
     }
 
     //////// MESSAGING /////////
 
     suspend fun broadcast(messageJson: String) {
-        println("messageJson: $messageJson")
-        players.forEach {player ->
+        println("Broadcast messageJson: $messageJson")
+
+        players.forEach { player ->
           if(player.socket.isActive) {
             player.socket.send(Frame.Text(messageJson))
           }
         }
     }
 
-    suspend fun broadcastToAllExceptOneClientId(messageJson: String, clientIdToExclude: ClientId) {
-        players.forEach {player ->
+    suspend fun broadcastToAllExceptOneClientId(
+        messageJson: String,
+        clientIdToExclude: ClientId
+    ) {
+        println("Broadcasting to all except ${getPlayerByClientId(clientIdToExclude)?.playerName}:")
+
+        players.forEach { player ->
             if(player.clientId != clientIdToExclude && player.socket.isActive) {
+                println("   ┡--> sending to ${player.playerName}:\n" +
+                        "   ┕----> $messageJson\n")
                 player.socket.send(Frame.Text(messageJson))
             }
         }
     }
 
     suspend fun sendToOnePlayer(messageJson: String, player: Player?) {
-        player?.let {
-            if(it.socket.isActive) {
-                it.socket.send(Frame.Text(messageJson))
+        player?.let { player ->
+            if(player.socket.isActive) {
+                player.socket.send(Frame.Text(messageJson))
             }
         }
     }

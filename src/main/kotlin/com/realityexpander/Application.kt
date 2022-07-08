@@ -6,6 +6,7 @@ package com.realityexpander
 // https://start.ktor.io/#/final?name=ktor-drawing-server&website=realityexpander.com&artifact=com.realityexpander.ktor-drawing-server&kotlinVersion=1.7.0&ktorVersion=1.5.3&buildSystem=GRADLE&engine=NETTY&configurationIn=HOCON&addSampleCode=true&plugins=content-negotiation%2Crouting%2Cktor-gson%2Cktor-websockets%2Cshutdown-url%2Ccall-logging
 
 import com.google.gson.Gson
+import com.realityexpander.common.Constants.QUERY_PARAMETER_CLIENT_ID
 import io.ktor.application.*
 import com.realityexpander.plugins.*
 import com.realityexpander.routes.createRoomRoute
@@ -35,10 +36,12 @@ fun Application.module() {
         cookie<DrawingSession>("SESSION")
     }
 
-    // Set up the sessions
+    // Set up the sessions & get the clientId from the query parameter
     intercept(ApplicationCallPipeline.Features) {
         call.sessions.get<DrawingSession>() ?: run {
-            val clientId = call.parameters["clientId"] ?: "" // throw IllegalArgumentException("clientId is required")
+
+            // Get the clientId from the client
+            val clientId = call.parameters[QUERY_PARAMETER_CLIENT_ID] ?: "" // throw IllegalArgumentException("clientId is required")
 
             call.sessions.set(DrawingSession(clientId, generateNonce()))
         }

@@ -25,7 +25,7 @@ fun Route.createRoomRoute() {
             }
 
             // Check if room exists
-            if(serverDB.roomsDB[roomRequest.name] != null) {
+            if(serverDB.roomsDB[roomRequest.roomName] != null) {
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponse(
                         false,
@@ -58,10 +58,9 @@ fun Route.createRoomRoute() {
             }
 
             // Create the room
-            val room = Room(roomRequest.name, roomRequest.maxPlayers)
-            serverDB.roomsDB[roomRequest.name] = room
+            serverDB.addRoomToServer(roomRequest.roomName, roomRequest.maxPlayers )
 
-            println("Created room: ${roomRequest.name}")
+            println("Created room: ${roomRequest.roomName}")
 
             call.respond(HttpStatusCode.OK,
                 BasicApiResponse(
@@ -176,16 +175,14 @@ fun Route.joinRoomRoute() {
             if(room.containsPlayerName(playerName)) {
                 call.respond(HttpStatusCode.OK,
                     BasicApiResponse(
-                        false,
-                        "Player already exists" )
+                        true,
+                        "Player is already in room, ok to rejoin" )
                 )
 
                 return@get
             }
 
-            // add player to room
-            // room.players += Player(playerName, )  // TODO: add player to room here, or in ws?
-
+            // Player can be added to room
             call.respond(HttpStatusCode.OK,
                 BasicApiResponse(
                     true,

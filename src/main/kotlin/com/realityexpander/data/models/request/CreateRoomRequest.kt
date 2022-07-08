@@ -1,6 +1,6 @@
 package com.realityexpander.data.models.request
 
 data class CreateRoomRequest(
-    val name: String,
+    val roomName: String,
     val maxPlayers: Int
 )

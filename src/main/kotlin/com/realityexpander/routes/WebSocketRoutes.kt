@@ -19,18 +19,15 @@ fun Route.gameWebSocketRoute() {
         standardWebSocket {
                 socket,
                 clientId,
-                messageJson,
+                messageJson,  // payload encoded as a JSON string
                 payload ->
 
             when(payload) {
-                is AddRoom -> {
-                    serverDB.addRoom(payload.roomName)
-                }
                 is JoinRoomHandshake -> {
                     val room = serverDB.roomsDB[payload.roomName]
 
                     if (room == null) {
-                        val gameError = GameError(GameError.ERROR_TYPE_ROOM_NOT_FOUND)
+                        val gameError = GameError(GameError.ERROR_TYPE_ROOM_NOT_FOUND, "Room not on found on server.")
                         // val gameError = GameError.ERROR_TYPE_ROOM_NOT_FOUND_MSG
                         socket.send(Frame.Text(gson.toJson(gameError))) // send error message to specific user who tried to join
                         return@standardWebSocket
@@ -45,23 +42,33 @@ fun Route.gameWebSocketRoute() {
 
                     // Add player to room
                     serverDB.addPlayerToRoom(newPlayer, room, socket)
+
+                    println("Player ${newPlayer.playerName} joined room ${room.roomName}")
                 }
                 is DrawData -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
+                    //println("DrawData from player=${room.getPlayerByClientId(clientId)?.playerName}\n" +
+                    //        "   ⎿__ payload: $payload\n" +
+                    //        "   ⎿__ messageJson: $messageJson"
+                    //)
+
+//                    if(room.gamePhase != Room.GamePhase.ROUND_IN_PROGRESS) { // todo remove for testing
                     if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
-                        room.addSerializedDrawActionJson(messageJson)
+                        room.addSerializedDrawDataJson(messageJson)
                     }
-                    room.lastDrawData = payload // used to finishOffDrawing
+                    room.lastDrawData = payload // used to finishOffDrawing (prevents a bug)
                 }
                 is DrawAction -> {
                     val room = serverDB.getRoomForPlayerClientId(clientId) ?: return@standardWebSocket
                     room.broadcastToAllExceptOneClientId(messageJson, clientId)
 
-                    // Just need to save the json strings, no need to parse it again as it
-                    //   will just be sent again to the client.
-                    room.addSerializedDrawActionJson(messageJson)
+                    println("DrawAction: $payload")
+
+                    // Just need to save the JSON strings, no need to parse it again as it
+                    //   will just be sent again to the client as JSON.
+                    room.addSerializedDrawDataJson(messageJson)
                 }
                 is SetWordToGuess -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
@@ -77,6 +84,7 @@ fun Route.gameWebSocketRoute() {
                     }
                 }
                 is Ping -> {
+                    // println("Ping received: username=${payload.username}")
                     serverDB.playersDB[clientId]?.receivedPong()
                 }
                 is DisconnectRequest -> {
@@ -115,10 +123,10 @@ fun Route.standardWebSocket(
                     val messageJson = frame.readText()
 
                     // Convert the messageJson to a JSON Object for easier handling
-                    val jsonObject = JsonParser.parseString(messageJson).asJsonObject
+                    val messageJsonObject = JsonParser.parseString(messageJson).asJsonObject
 
                     // Extract the type of message
-                    val typeStr = jsonObject["type"].asString
+                    val typeStr = messageJsonObject["type"].asString
                         ?: throw IllegalArgumentException("Error: 'type' field not found in $messageJson")
 
                     // Convert "type" to a socket message class to be used for gson deserialization
@@ -128,7 +136,7 @@ fun Route.standardWebSocket(
                             BaseMessageType::class.java // throw IllegalArgumentException("Unknown message type")
                         }
 
-                    // convert payload JSON string to the type from the webSocket message
+                    // convert messageJson string to the "type" from the frame and use this as the payload
                     val payload = gson.fromJson(messageJson, type)
                     handleFrame(this, session.clientId, messageJson, payload)
                 }

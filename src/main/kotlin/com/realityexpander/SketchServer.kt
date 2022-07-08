@@ -15,21 +15,22 @@ class SketchServer {  // DrawingServer todo remove at end
     val roomsDB = ConcurrentHashMap<RoomName, Room>()  // uses ConcurrentHashMap to avoid ConcurrentModificationException, ie: many threads can access the same room at the same time
     val playersDB = ConcurrentHashMap<ClientId, Player>()
 
-    fun addRoom(roomName: RoomName) {
-        if(!roomsDB.containsKey(roomName))
-            roomsDB[roomName] = Room(roomName, ROOM_MAX_NUM_PLAYERS)
-
-        println("roomsDB=$roomsDB, playersDB=$playersDB")
-    }
+//    fun addRoom(roomName: RoomName) {  // remove - was only used for testing
+//        if(!roomsDB.containsKey(roomName))
+//            roomsDB[roomName] = Room(roomName, ROOM_MAX_NUM_PLAYERS)
+//
+//        println("roomsDB=$roomsDB, playersDB=$playersDB")
+//    }
 
     fun addPlayerToRoom(newPlayer: Player, room: Room, socket: DefaultWebSocketServerSession) {
         GlobalScope.launch {
             // Add the player to the server
-            playersDB[newPlayer.clientId] = newPlayer
+            addPlayerToServerDB(newPlayer)
 
             // Add player to room
             if (!room.containsPlayerClientId(newPlayer.clientId)) {
-                // Room does not have this player yet, add it
+                // XXX IGNORE XXXXX Room does not have this player yet, add it XXXXXX  ??? todo remove at end
+                // NOTE: player is first added by the JoinRoomHandshake socket message, not this method! ??? todo remove at end
                 room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
             } else {
                 // player has quickly disconnected then reconnected, so just update the socket
@@ -44,7 +45,7 @@ class SketchServer {  // DrawingServer todo remove at end
         }
     }
 
-    // playerLeft // todo remove at end
+    // Player exiting (either on purpose or a ping timeout) // playerLeft // todo remove at end
     fun removePlayerFromRoom(removeClientId: ClientId, isImmediateDisconnect: Boolean = false) {
         // Find the room for the player
         val roomOfPlayer = getRoomForPlayerClientId(removeClientId)
@@ -54,18 +55,27 @@ class SketchServer {  // DrawingServer todo remove at end
 
             playersDB[removeClientId]?.stopPinging()
             roomOfPlayer?.removePlayer(removeClientId, isImmediateDisconnect)
-            removePlayerFromServer(removeClientId)
+            removePlayerFromServerDB(removeClientId)
         }
 
         roomOfPlayer?.removePlayer(removeClientId, isImmediateDisconnect)
     }
 
-    fun removePlayerFromServer(removeClientId: ClientId) {
-        playersDB -= removeClientId
+    fun addRoomToServer(roomName: RoomName, maxPlayers: Int) {
+        val room = Room(roomName, maxPlayers)
+        serverDB.roomsDB[roomName] = room
     }
 
-    fun removeRoomFromServer(removeRoomName: RoomName) {
+    fun removeRoomFromServerDB(removeRoomName: RoomName) {
         roomsDB -= removeRoomName
+    }
+
+    private fun addPlayerToServerDB(newPlayer: Player) {
+        playersDB[newPlayer.clientId] = newPlayer
+    }
+
+    fun removePlayerFromServerDB(removeClientId: ClientId) {
+        playersDB -= removeClientId
     }
 
     fun getRoomForPlayerClientId(clientId: ClientId): Room? {
@@ -75,4 +85,5 @@ class SketchServer {  // DrawingServer todo remove at end
             } != null
         }
     }
+
 }
