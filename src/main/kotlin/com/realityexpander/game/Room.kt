@@ -124,7 +124,7 @@ class Room(
     private fun newRoundPhase() {  // newRound // todo remove at end
         curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
-        val newWordsToGuess = NewWords(curWords!!)
+        val newWordsToGuess = NewWordsHolder(curWords!!)
 
         proceedToNextDrawingPlayer()
         GlobalScope.launch {
@@ -187,7 +187,7 @@ class Room(
             // Score has possibly changed
             broadcastAllPlayersData()
 
-            // Broadcast the wordToGuess to all players
+            // Broadcast the unmasked wordToGuess to all players
             wordToGuess?.let { wordToGuess ->
                 val word = SetWordToGuess(
                     wordToGuess = wordToGuess,
@@ -638,8 +638,8 @@ class Room(
         }
     }
 
-    suspend fun sendToOnePlayer(messageJson: String, player: Player?) {
-        player?.let { player ->
+    suspend fun sendToOnePlayer(messageJson: String, sendToPlayer: Player?) {
+        sendToPlayer?.let { player ->
             if(player.socket.isActive) {
                 player.socket.send(Frame.Text(messageJson))
             }
