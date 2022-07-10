@@ -72,7 +72,7 @@ fun Route.gameWebSocketRoute() {
                 is SetWordToGuess -> {  // Drawing player has set the word to guess
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
-                    println("TYPE_SET_WORD_TO_GUESS - Drawing player has set the word to guess: ${payload.wordToGuess}, for room: ${room.roomName}")
+                    println("TYPE_SET_WORD_TO_GUESS - Drawing player has set the word to guess: \"${payload.wordToGuess}\", for room: '${room.roomName}'")
 
                     room.drawingPlayerSetWordToGuessAndStartRound(payload.wordToGuess)
                 }

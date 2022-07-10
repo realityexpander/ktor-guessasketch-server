@@ -127,7 +127,7 @@ class Room(
     private fun newRoundPhase() {  // newRound // todo remove at end
         curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
-        val wordsToPickHolder = WordsToPickHolder(curWords!!)
+        val wordsToPickHolder = WordsToPick(curWords!!)
         this.wordToGuess = null // reset the word to guess
 
         proceedToNextDrawingPlayer()
@@ -153,14 +153,14 @@ class Room(
         val wordToGuessToSendDrawingPlayer = wordToGuess ?: curWords?.random() ?: words.random()
         val wordToGuessToSendAsUnderscores = wordToGuessToSendDrawingPlayer.transformToUnderscores()
 
-        // Drawing player gets sent the word to guess
+        // Drawing player is sent the actual word to guess
         val gameStateForDrawingPlayer = GameState(
             drawingPlayer?.playerName!!,
             drawingPlayer?.clientId!!,
             wordToGuessToSendDrawingPlayer
         )
 
-        // Other players get sent the word to guess AS UNDERSCORES
+        // Other players are sent the word to guess AS UNDERSCORES
         val gameStateForGuessingPlayers = GameState(
             drawingPlayer?.playerName!!,
             drawingPlayer?.clientId!!,
@@ -180,17 +180,18 @@ class Room(
                 gson.toJson(gameStateForDrawingPlayer),
                 drawingPlayer
             )
+
+            startGamePhaseCountdownTimerAndNotifyPlayers(
+                DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
+            )
+
+            println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
+                    " ┡--> drawingPlayer: '${drawingPlayer?.playerName!!}'\n" +
+                    " ┡--> wordToGuess to drawingPlayer: '$wordToGuessToSendDrawingPlayer'\n" +
+                    " ┡--> wordToGuess to guessing players: '$wordToGuessToSendAsUnderscores'\n" +
+                    " ┕--> Countdown Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
         }
 
-        startGamePhaseCountdownTimerAndNotifyPlayers(
-            DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
-        )
-
-        println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
-                " ┡--> drawingPlayer: ${drawingPlayer?.playerName!!}\n" +
-                " ┡--> wordToGuess to drawingPlayer: $wordToGuessToSendDrawingPlayer\n" +
-                " ┡--> wordToGuess to guessing players: $wordToGuessToSendAsUnderscores\n" +
-                " ┕--> Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
     }
 
     private fun roundEndedPhase(){
@@ -657,11 +658,11 @@ class Room(
         messageJson: String,
         clientIdToExclude: ClientId
     ) {
-        println("Broadcasting to all except ${getPlayerByClientId(clientIdToExclude)?.playerName}:")
+        println("Broadcasting to all except '${getPlayerByClientId(clientIdToExclude)?.playerName}':")
 
         players.forEach { player ->
             if(player.clientId != clientIdToExclude && player.socket.isActive) {
-                println("   ┡--> sending to ${player.playerName}:\n" +
+                println("   ┡--> sending to '${player.playerName}':\n" +
                         "   ┕----> $messageJson\n")
                 player.socket.send(Frame.Text(messageJson))
             }
