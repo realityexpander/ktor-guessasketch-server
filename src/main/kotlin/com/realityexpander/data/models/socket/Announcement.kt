@@ -14,5 +14,6 @@ data class Announcement(
         const val ANNOUNCEMENT_PLAYER_EXITED_ROOM = 2
         const val ANNOUNCEMENT_EVERYBODY_GUESSED_CORRECTLY = 3
         const val ANNOUNCEMENT_NOBODY_GUESSED_CORRECTLY = 4
+        const val ANNOUNCEMENT_GENERAL_MESSAGE = 5
     }
 }

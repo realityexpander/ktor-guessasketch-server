@@ -190,6 +190,13 @@ class Room(
                     " ┡--> wordToGuess to drawingPlayer: '$wordToGuessToSendDrawingPlayer'\n" +
                     " ┡--> wordToGuess to guessing players: '$wordToGuessToSendAsUnderscores'\n" +
                     " ┕--> Countdown Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
+
+            // Announce to players to guess now!
+            broadcast(gson.toJson(Announcement(
+                message = "Round started - Try to guess the word!",
+                System.currentTimeMillis(),
+                announcementType = Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
+            )))
         }
 
     }
@@ -217,15 +224,11 @@ class Room(
                 }
 
                 // Announce no players got it
-                broadcast(
-                    gson.toJson(
-                        Announcement(
+                broadcast(gson.toJson(Announcement(
                             message = "No players guessed the word: $wordToGuess",
                             System.currentTimeMillis(),
                             announcementType = Announcement.ANNOUNCEMENT_NOBODY_GUESSED_CORRECTLY
-                        )
-                    )
-                )
+                )))
             }
 
             // Score has possibly changed
