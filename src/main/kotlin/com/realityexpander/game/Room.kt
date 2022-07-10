@@ -117,13 +117,14 @@ class Room(
         }
     }
 
-    // Starting the round, pick a drawing player and let them choose a word from the list of words
+    // Starting the round, choose a drawing player and let them pick a word from the list of 3 words
     private fun newRoundPhase() {  // newRound // todo remove at end
         curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
         val wordsToPickHolder = WordsToPick(curWords!!)
         this.wordToGuess = null // reset the word to guess
 
+        // Pick a drawing player
         proceedToNextDrawingPlayer()
 
         // Send the list of words to guess to the drawing player to pick one
@@ -138,7 +139,7 @@ class Room(
         }
     }
 
-    private fun roundInProgressPhase(){ // game_running gameRunning  // todo remove at end
+    private fun roundInProgressPhase() { // game_running gameRunning  // todo remove at end
         drawingPlayer ?: throw IllegalStateException("drawingPlayer is null")
 
         winningPlayers = listOf() // reset the list of winning players
@@ -203,12 +204,12 @@ class Room(
 
             // Broadcast the unmasked wordToGuess to all players
             wordToGuess?.let { wordToGuess ->
-                val word = GameState(
+                val gameState = GameState(
                     drawingPlayer?.playerName!!,
                     drawingPlayer?.clientId!!,
                     wordToGuess = wordToGuess
                 )
-                broadcast(gson.toJson(word))
+                broadcast(gson.toJson(gameState))
             }
 
 
@@ -591,6 +592,8 @@ class Room(
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
             //players = players - player // phillip mistake? todo remove at end
 
+            println("removePlayer delayed ${PLAYER_EXIT_REMOVE_DELAY_MILLIS/1000L} seconds, player: ${playerToRemove.playerName}")
+
             // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_DELAY_MILLIS from now.
             playerRemoveJobs[removeClientId] = GlobalScope.launch {
                 delay(PLAYER_EXIT_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
@@ -610,12 +613,16 @@ class Room(
 
                 // Check if there is only one player
                 if(players.size == 1) {
+                    println("removePlayer - Only one player, changing to phase WAITING_FOR_PLAYERS")
+
                     gamePhase = GamePhase.WAITING_FOR_PLAYERS
                     timerJob?.cancel()
                 }
 
                 // Check if there are no players
                 if(players.isEmpty()) {
+                    println("removePlayer - No players left in the room, killing the room")
+
                     killRoom()
                 }
             }
