@@ -53,7 +53,9 @@ fun Route.gameWebSocketRoute() {
                     //        "   ⎿__ messageJson: $messageJson"
                     //)
 
-                    if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
+                    if( room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS ||
+                        room.gamePhase == Room.GamePhase.ROUND_ENDED
+                    ) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                         room.addSerializedDrawDataJson(messageJson)
                     }

@@ -114,12 +114,6 @@ class Room(
             startGamePhaseCountdownTimerAndNotifyPlayers(
                 DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             )
-
-//            val gamePhaseUpdate = GamePhaseUpdate(
-//                gamePhase = GamePhase.WAITING_FOR_START,
-//                DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
-//            )
-//            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
@@ -151,6 +145,7 @@ class Room(
 
         // define the word that players must guess, and if the drawing player didn't set it, pick one at random
         val wordToGuessToSendDrawingPlayer = wordToGuess ?: curWords?.random() ?: words.random()
+        wordToGuess = wordToGuessToSendDrawingPlayer  // in case the drawing player didn't set it
         val wordToGuessToSendAsUnderscores = wordToGuessToSendDrawingPlayer.transformToUnderscores()
 
         // Drawing player is sent the actual word to guess
@@ -410,7 +405,7 @@ class Room(
             // Set and Start the game phase countdown timer
             gamePhaseStartTimeMillis = System.currentTimeMillis()
             val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase,  // new phase of the game to change to
+                gamePhase,  // change to new phase of the game
                 gamePhaseDurationMillis,
                 drawingPlayer?.playerName
             )
@@ -696,7 +691,7 @@ class Room(
                 player.socket.send(Frame.Text(messageJson))
                 println("Send to one player: '${sendToPlayer.playerName}', message: $messageJson")
             } else {
-                println("sendToOnePlayer - Player ${player.playerName} is not active, cannot send message")
+                println("sendToOnePlayer - Player '${player.playerName}' is not active, cannot send message")
             }
         }
     }

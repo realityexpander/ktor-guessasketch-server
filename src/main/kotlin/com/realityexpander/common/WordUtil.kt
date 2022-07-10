@@ -33,7 +33,7 @@ fun getRandomWords(amount: Int): List<String> {
 
 // apple juice
 // -> _ _ _ _ _  _ _ _ _ _
-fun String.transformToUnderscores() = this.replace("[a-zA-Z]".toRegex(), "_ ").trim()
+fun String.transformToUnderscores() = this.replace("[a-zA-Z0-9]".toRegex(), "_ ").trim()
 // in code:
 //toCharArray().map {
 //    if(it != ' ') '_' else ' ' }
@@ -48,4 +48,5 @@ fun main() {
 
     println("apple juice")
     println("apple juice".transformToUnderscores())
+    println("5g".transformToUnderscores())
 }
