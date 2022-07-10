@@ -199,24 +199,37 @@ class Room(
 
         GlobalScope.launch {
 
+            // Broadcast the unmasked wordToGuess to all players
+            wordToGuess?.let { wordToGuess ->
+                val word = GameState(
+                    drawingPlayer?.playerName!!,
+                    drawingPlayer?.clientId!!,
+                    wordToGuess = wordToGuess
+                )
+                broadcast(gson.toJson(word))
+            }
+
+
             // Reduce the drawing player's score by the penalty for not guessing the word
             if(winningPlayers.isEmpty()) {
                 drawingPlayer?.let {player ->
                     player.score -= SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
                 }
+
+                // Announce no players got it
+                broadcast(
+                    gson.toJson(
+                        Announcement(
+                            message = "No players guessed the word: $wordToGuess",
+                            System.currentTimeMillis(),
+                            announcementType = Announcement.ANNOUNCEMENT_NOBODY_GUESSED_CORRECTLY
+                        )
+                    )
+                )
             }
 
             // Score has possibly changed
             broadcastAllPlayersData()
-
-            // Broadcast the unmasked wordToGuess to all players
-            wordToGuess?.let { wordToGuess ->
-                val word = SetWordToGuess(
-                    wordToGuess = wordToGuess,
-                    roomName = roomName
-                )
-                broadcast(gson.toJson(word))
-            }
 
             startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS)
             val gamePhaseUpdate = GamePhaseUpdate(
@@ -274,7 +287,7 @@ class Room(
         winningPlayers = winningPlayers + player
 
         if(winningPlayers.size == players.size - 1) {
-            gamePhase = GamePhase.NEW_ROUND
+            gamePhase = GamePhase.ROUND_ENDED
             return true
         }
 

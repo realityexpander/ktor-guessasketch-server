@@ -81,6 +81,8 @@ fun Route.gameWebSocketRoute() {
 
                     // Does this message text contain the correct guess for the word?
                     if(!room.checkWordThenScoreAndNotifyPlayers(payload)) {
+
+                        // No winning guess, so just send the chat message as normal
                         room.broadcast(messageJson)
                     }
                 }
