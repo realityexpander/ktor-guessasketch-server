@@ -686,10 +686,10 @@ class Room(
             return
         }
 
-        sendToPlayer?.let { player ->
+        sendToPlayer.let { player ->
             if(player.socket.isActive) {
                 player.socket.send(Frame.Text(messageJson))
-                println("Send to one player: '${sendToPlayer.playerName}', message: $messageJson")
+                println("Sending to one player: '${sendToPlayer.playerName}', message: $messageJson")
             } else {
                 println("sendToOnePlayer - Player '${player.playerName}' is not active, cannot send message")
             }
