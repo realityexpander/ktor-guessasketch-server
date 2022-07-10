@@ -43,7 +43,7 @@ fun Route.gameWebSocketRoute() {
                     // Add player to room
                     serverDB.addPlayerToRoom(newPlayer, room, socket)
 
-                    println("Player ${newPlayer.playerName} joined room ${room.roomName}")
+                    println("Player '${newPlayer.playerName}' joined room '${room.roomName}'")
                 }
                 is DrawData -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
@@ -53,7 +53,6 @@ fun Route.gameWebSocketRoute() {
                     //        "   ⎿__ messageJson: $messageJson"
                     //)
 
-//                    if(room.gamePhase != Room.GamePhase.ROUND_IN_PROGRESS) { // todo remove for testing
                     if(room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                         room.addSerializedDrawDataJson(messageJson)
@@ -70,10 +69,12 @@ fun Route.gameWebSocketRoute() {
                     //   will just be sent again to the client as JSON.
                     room.addSerializedDrawDataJson(messageJson)
                 }
-                is SetWordToGuess -> {
+                is SetWordToGuess -> {  // Drawing player has set the word to guess
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
-                    room.setWordToGuessAndStartRound(payload.wordToGuess)
+                    println("TYPE_SET_WORD_TO_GUESS - Drawing player has set the word to guess: ${payload.wordToGuess}, for room: ${room.roomName}")
+
+                    room.drawingPlayerSetWordToGuessAndStartRound(payload.wordToGuess)
                 }
                 is ChatMessage -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket

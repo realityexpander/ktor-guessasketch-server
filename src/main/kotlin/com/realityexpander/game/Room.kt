@@ -36,7 +36,7 @@ class Room(
     }
 
     companion object {
-        const val UPDATE_TIME_FREQUENCY_MILLIS = 1000L
+        const val TIMER_UPDATE_FREQUENCY_MILLIS = 1000L
 
         const val DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS = 10000L
         const val DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS = 20000L
@@ -64,7 +64,6 @@ class Room(
 
     init {
 
-        // commented for testing.... remove later todo
         // When the gamePhase is set, this listener calls the appropriate func
         setGamePhaseChangeListener { newGamePhase ->
             when(newGamePhase) {
@@ -79,12 +78,13 @@ class Room(
         }
     }
 
+    // Change game phase to a new phase and call the phase change function
     private var gamePhaseChangeListener: ((GamePhase) -> Unit)? = null
     var gamePhase = GamePhase.INITIAL_STATE
         private set(newGamePhase) {
             synchronized(field) {  // to allow for concurrent access
                 field = newGamePhase
-                println("Changing game phase to $newGamePhase")
+                println("Changing game phase to --> $newGamePhase")
                 gamePhaseChangeListener?.let { gamePhaseFunction ->
                     gamePhaseFunction(newGamePhase)  // set the next phase of the game
                 }
@@ -98,6 +98,7 @@ class Room(
 
     /// GAME PHASES ///
 
+    // Waiting for more than 1 player to join the room
     private fun waitingForPlayersPhase(){
         GlobalScope.launch {
             val gamePhaseUpdate = GamePhaseUpdate(
@@ -107,58 +108,78 @@ class Room(
         }
     }
 
+    // Waiting for more players to join the room
     private fun waitingForStartPhase(){
         GlobalScope.launch {
             startGamePhaseCountdownTimerAndNotifyPlayers(
                 DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             )
 
-            val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase = GamePhase.WAITING_FOR_START,
-                DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
-            )
-            broadcast(gson.toJson(gamePhaseUpdate))
+//            val gamePhaseUpdate = GamePhaseUpdate(
+//                gamePhase = GamePhase.WAITING_FOR_START,
+//                DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
+//            )
+//            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
+    // Starting the round, pick a drawing player and let them choose a word from the list of words
     private fun newRoundPhase() {  // newRound // todo remove at end
         curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
-        val newWordsToGuess = NewWordsHolder(curWords!!)
+        val wordsToPickHolder = WordsToPickHolder(curWords!!)
+        this.wordToGuess = null // reset the word to guess
 
         proceedToNextDrawingPlayer()
+
+        // Send the list of words to guess to the drawing player to pick one
         GlobalScope.launch {
-            sendToOnePlayer(gson.toJson(newWordsToGuess), drawingPlayer)
             startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
+
+            // Send the drawing player the list of words to pick from
+            sendToOnePlayer(gson.toJson(wordsToPickHolder), drawingPlayer)
+
+            // Send the stats for all players
             broadcastAllPlayersData()
         }
     }
 
     private fun roundInProgressPhase(){ // game_running gameRunning  // todo remove at end
-        winningPlayers = listOf() // reset the winning players
-        val wordToSend = wordToGuess ?: curWords?.random() ?: words.random()
-        val wordAsUnderscores = wordToSend.transformToUnderscores()
-        val drawingPlayerName = (drawingPlayer ?: players.random()).playerName
+        drawingPlayer ?: throw IllegalStateException("drawingPlayer is null")
 
-        // Drawing player gets the word to guess
+        winningPlayers = listOf() // reset the list of winning players
+
+        // define the word that players must guess, and if the drawing player didn't set it, pick one at random
+        val wordToGuessToSendDrawingPlayer = wordToGuess ?: curWords?.random() ?: words.random()
+        val wordToGuessToSendAsUnderscores = wordToGuessToSendDrawingPlayer.transformToUnderscores()
+
+        // Drawing player gets sent the word to guess
         val gameStateForDrawingPlayer = GameState(
-            drawingPlayerName,
-            wordToSend
+            drawingPlayer?.playerName!!,
+            drawingPlayer?.clientId!!,
+            wordToGuessToSendDrawingPlayer
         )
 
-        // Other players get the word to guess as underscores
+        // Other players get sent the word to guess AS UNDERSCORES
         val gameStateForGuessingPlayers = GameState(
-            drawingPlayerName,
-            wordAsUnderscores
+            drawingPlayer?.playerName!!,
+            drawingPlayer?.clientId!!,
+            wordToGuessToSendAsUnderscores
         )
 
         // Send the new GameState to all players
         GlobalScope.launch {
+            // send the word to guess (as underscores) to everyone except the drawing player
             broadcastToAllExceptOneClientId(
                 gson.toJson(gameStateForGuessingPlayers),
-                drawingPlayer?.clientId ?: players.random().clientId
+                drawingPlayer?.clientId!!
             )
-            sendToOnePlayer(gson.toJson(gameStateForDrawingPlayer), drawingPlayer)
+
+            // Send the actual word to guess to the drawing player
+            sendToOnePlayer(
+                gson.toJson(gameStateForDrawingPlayer),
+                drawingPlayer
+            )
         }
 
         startGamePhaseCountdownTimerAndNotifyPlayers(
@@ -166,10 +187,10 @@ class Room(
         )
 
         println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
-                "drawing player: $drawingPlayerName\n" +
-                "word to guess: $wordToSend\n" +
-                "Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
-
+                " ┡--> drawingPlayer: ${drawingPlayer?.playerName!!}\n" +
+                " ┡--> wordToGuess to drawingPlayer: $wordToGuessToSendDrawingPlayer\n" +
+                " ┡--> wordToGuess to guessing players: $wordToGuessToSendAsUnderscores\n" +
+                " ┕--> Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
     }
 
     private fun roundEndedPhase(){
@@ -208,21 +229,29 @@ class Room(
 
     // GAME STATE UTILS //
 
-    fun setWordToGuessAndStartRound(wordToGuess: String) {
+    fun drawingPlayerSetWordToGuessAndStartRound(wordToGuess: String) {
         this.wordToGuess = wordToGuess
         gamePhase = GamePhase.ROUND_IN_PROGRESS
     }
 
     fun proceedToNextDrawingPlayer() {
-        drawingPlayer?.isDrawing = false
         if(players.isEmpty()) return
 
+        // Reset all the players `isDrawing` status, just to be safe, :)
+        for (player in players) {
+            player.isDrawing = false
+        }
+        drawingPlayer?.isDrawing = false // reset the current drawing player status
+
+        // Pick the new drawing player
         drawingPlayer = if(drawingPlayerIndex <= players.size - 1) {
             players[drawingPlayerIndex]
         } else {
             players.last()
         }
+        drawingPlayer?.isDrawing = true
 
+        // Setup for the next new drawing player
         if(drawingPlayerIndex <= players.size - 1) {
             drawingPlayerIndex++
         } else {
@@ -271,7 +300,7 @@ class Room(
 
             // Tell other players a winner has occurred
             var announcement = Announcement(
-                message = "${winningPlayer.playerName} guessed the word correctly!",
+                message = "Player '${winningPlayer.playerName}' guessed the word correctly!",
                 timestamp = System.currentTimeMillis(),
                 Announcement.ANNOUNCEMENT_PLAYER_GUESSED_CORRECTLY
             )
@@ -300,7 +329,7 @@ class Room(
 
     // When a player joins a room (connect or reconnects)
     // Inform the player of the word to guess and the current phase
-    suspend fun sendWordToPlayer(player: Player) {
+    suspend fun sendWordToGuessToPlayer(player: Player) {
         val delay = when(gamePhase) {
             GamePhase.WAITING_FOR_START -> DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
             GamePhase.NEW_ROUND -> DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS
@@ -318,6 +347,7 @@ class Room(
             drawingPlayer?.let { drawingPlayer ->
                 val gameState = GameState(
                     drawingPlayer.playerName,
+                    drawingPlayer.clientId,
                     if(player.isDrawing || gamePhase == GamePhase.ROUND_ENDED) {
                         curWordToGuess
                     } else {
@@ -355,7 +385,7 @@ class Room(
     // 4. Notify the players that the phase has ended
     // 5. Proceed to the next phase of the game
     // timeAndNotify  todo remove at end
-    private fun startGamePhaseCountdownTimerAndNotifyPlayers(startPhaseTimerMillis: Long) {
+    private fun startGamePhaseCountdownTimerAndNotifyPlayers(gamePhaseDurationMillis: Long) {
 
         timerJob?.cancel()
         timerJob = GlobalScope.launch {
@@ -363,8 +393,8 @@ class Room(
             // Set and Start the game phase countdown timer
             gamePhaseStartTimeMillis = System.currentTimeMillis()
             val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase,
-                startPhaseTimerMillis,
+                gamePhase,  // new phase of the game to change to
+                gamePhaseDurationMillis,
                 drawingPlayer?.playerName
             )
 
@@ -372,7 +402,7 @@ class Room(
             broadcast(gson.toJson(gamePhaseUpdate))
 
             // Send players the current countdown time
-            repeat( (startPhaseTimerMillis / UPDATE_TIME_FREQUENCY_MILLIS).toInt() ) { count ->
+            repeat( (gamePhaseDurationMillis / TIMER_UPDATE_FREQUENCY_MILLIS).toInt() ) { count ->
 
                 // Notify the players of the current countdown time for this game phase
                 if(count != 0) {
@@ -385,8 +415,8 @@ class Room(
                 }
 
                 // Decrement the countdown time
-                gamePhaseUpdate.countdownTimerMillis -= UPDATE_TIME_FREQUENCY_MILLIS
-                delay(UPDATE_TIME_FREQUENCY_MILLIS)
+                gamePhaseUpdate.countdownTimerMillis -= TIMER_UPDATE_FREQUENCY_MILLIS
+                delay(TIMER_UPDATE_FREQUENCY_MILLIS)
             }
 
             // Go to the next phase of the game
@@ -514,10 +544,10 @@ class Room(
             players = players.shuffled()
         }
 
-        sendWordToPlayer(newPlayer)
+        sendWordToGuessToPlayer(newPlayer)
 
         // Send announcement to all players
-        val announcement = Announcement( "Player $playerName has joined the game",
+        val announcement = Announcement( "Player '$playerName' has joined the game",
             System.currentTimeMillis(),
             Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
         )
@@ -639,9 +669,17 @@ class Room(
     }
 
     suspend fun sendToOnePlayer(messageJson: String, sendToPlayer: Player?) {
+        sendToPlayer ?: run {
+            println("sendToOnePlayer: sendToPlayer is null")
+            return
+        }
+
         sendToPlayer?.let { player ->
             if(player.socket.isActive) {
                 player.socket.send(Frame.Text(messageJson))
+                println("Send to one player: '${sendToPlayer.playerName}', message: $messageJson")
+            } else {
+                println("sendToOnePlayer - Player ${player.playerName} is not active, cannot send message")
             }
         }
     }
