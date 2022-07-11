@@ -162,7 +162,7 @@ fun Route.standardWebSocket(
                 serverDB.removePlayerFromRoom(session.clientId)
             }
 
-            //close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Closing")) // remove soon todo
+            //close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Closing")) // needed? remove soon todo
         }
     }
 }

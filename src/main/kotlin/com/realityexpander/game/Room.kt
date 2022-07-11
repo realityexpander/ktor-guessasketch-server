@@ -6,7 +6,6 @@ import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
-import com.realityexpander.data.ExitingPlayer
 import com.realityexpander.data.models.socket.*
 import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_GENERAL_MESSAGE
 import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_PLAYER_EXITED_ROOM
@@ -544,7 +543,7 @@ class Room(
         sendWordToGuessToPlayer(newPlayer)
 
         // Send announcement to all players
-        val announcement = Announcement( "Player '$playerName' has joined the game",
+        val announcement = Announcement( "Player '$playerName' has joined the room",
             System.currentTimeMillis(),
             Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
         )
