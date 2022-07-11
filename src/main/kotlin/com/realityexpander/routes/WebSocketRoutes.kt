@@ -81,7 +81,7 @@ fun Route.gameWebSocketRoute() {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
 
                     // Does this message text contain the correct guess for the word?
-                    if(!room.checkWordThenScoreAndNotifyPlayers(payload)) {
+                    if(!room.checkChatMessageContainsWordToGuessThenScoreAndNotifyPlayers(payload)) {
 
                         // No winning guess, so just send the chat message as normal
                         room.broadcast(messageJson)

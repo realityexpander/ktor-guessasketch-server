@@ -56,7 +56,9 @@ class Room(
                 GamePhaseUpdate.GamePhase.NEW_ROUND -> newRoundPhase()
                 GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS -> roundInProgressPhase()
                 GamePhaseUpdate.GamePhase.ROUND_ENDED -> roundEndedPhase()
-                else -> {}
+                else -> {
+                    println("ERROR: setGamePhaseChangeListener - Unknown game phase: $newGamePhase")
+                }
             }
         }
     }
@@ -79,7 +81,9 @@ class Room(
     }
 
 
+    ///////////////////
     /// GAME PHASES ///
+    ///////////////////
 
     // Waiting for more than 1 player to join the room
     private fun waitingForPlayersPhase() {
@@ -212,23 +216,19 @@ class Room(
             broadcastAllPlayersData()
 
             startGamePhaseCountdownTimerAndNotifyPlayers()
-//            val gamePhaseUpdate = GamePhaseUpdate(
-//                gamePhase = GamePhaseUpdate.GamePhase.ROUND_ENDED,
-//                countdownTimerMillis = gamePhase.phaseDurationMillis
-//            )
-//
-//            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
-    // GAME STATE UTILS //
+    //////////////////////////////
+    /// GAME PHASE/STATE UTILS ///
+    //////////////////////////////
 
     fun drawingPlayerSetWordToGuessAndStartRound(wordToGuess: String) {
         this.wordToGuess = wordToGuess
         gamePhase = GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS
     }
 
-    fun proceedToNextDrawingPlayer() {
+    private fun proceedToNextDrawingPlayer() {
         if(players.isEmpty()) return
 
         // Reset all the players `isDrawing` status, just to be safe, :)
@@ -255,7 +255,7 @@ class Room(
 
     // Check chat message for correct guess and also that the guess is *not* from a
     //   winning player (ie: no cheating for entering the word multiple times!)
-    fun isGuessCorrect(guessChatMessage: ChatMessage): Boolean {
+    private fun isGuessCorrect(guessChatMessage: ChatMessage): Boolean {
         return guessChatMessage.containsWord(wordToGuess ?: return false)
                 && !winningPlayers.containsPlayerClientId(guessChatMessage.fromClientId)
                 && guessChatMessage.fromClientId != drawingPlayer?.clientId
@@ -275,7 +275,7 @@ class Room(
     }
 
     // Returns true if the player has guessed the word
-    suspend fun checkWordThenScoreAndNotifyPlayers(message: ChatMessage): Boolean {
+    suspend fun checkChatMessageContainsWordToGuessThenScoreAndNotifyPlayers(message: ChatMessage): Boolean {
         if(isGuessCorrect(message)) {
             val winningPlayer = getPlayerByClientId(message.fromClientId) ?: return false
 
@@ -323,7 +323,7 @@ class Room(
 
     // When a player joins a room (connect or reconnects)
     // Inform the player of the word to guess and the current phase
-    suspend fun sendWordToGuessToPlayer(player: Player) {
+    private suspend fun sendWordToGuessToPlayer(player: Player) {
 
         val delay = gamePhase.phaseDurationMillis
 
@@ -351,7 +351,7 @@ class Room(
     }
 
     // Send data of players (score, rank, name, etc) to all the players
-    suspend fun broadcastAllPlayersData() {  // broadcastPlayerStates // todo remove at end
+    private suspend fun broadcastAllPlayersData() {  // broadcastPlayerStates // todo remove at end
         // Collect the data for all players
         val playersList = players.sortedByDescending { it.score }.map { player ->
             PlayerData(player.playerName, player.isDrawing, player.score, player.rank)
@@ -678,7 +678,7 @@ class Room(
         }
     }
 
-    suspend fun sendToOnePlayer(messageJson: String, sendToPlayer: Player?) {
+    private suspend fun sendToOnePlayer(messageJson: String, sendToPlayer: Player?) {
         sendToPlayer ?: run {
             println("sendToOnePlayer: sendToPlayer is null")
             return
@@ -704,7 +704,7 @@ class Room(
         return players.find { it.clientId == clientId } != null
     }
 
-    fun List<Player>.containsPlayerClientId(clientId: ClientId): Boolean {
+    private fun List<Player>.containsPlayerClientId(clientId: ClientId): Boolean {
         return find { it.clientId == clientId } != null
     }
 
