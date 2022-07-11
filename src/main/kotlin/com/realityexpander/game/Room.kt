@@ -41,7 +41,7 @@ class Room(
     private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()  // leftPlayers todo remove
 
     // Track drawing data
-    private var curRoundDrawData: List<String> = listOf()
+    private var curRoundDrawData: List<String> = listOf()  // list of json strings of DrawData and DrawAction objects
     var lastDrawData: DrawData? = null  // prevent bug where the player is touch_down and the round has ended before the touch_up
 
     ////// GAME STATE MACHINE ///////
@@ -458,7 +458,7 @@ class Room(
     }
 
     // Send the serialized drawing data to all the players
-    private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
+    suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
         if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
             gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
         ) {

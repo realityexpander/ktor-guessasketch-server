@@ -15,12 +15,6 @@ class SketchServer {  // DrawingServer todo remove at end
     val roomsDB = ConcurrentHashMap<RoomName, Room>()  // uses ConcurrentHashMap to avoid ConcurrentModificationException, ie: many threads can access the same room at the same time
     val playersDB = ConcurrentHashMap<ClientId, Player>()
 
-//    fun addRoom(roomName: RoomName) {  // remove - was only used for testing
-//        if(!roomsDB.containsKey(roomName))
-//            roomsDB[roomName] = Room(roomName, ROOM_MAX_NUM_PLAYERS)
-//
-//        println("roomsDB=$roomsDB, playersDB=$playersDB")
-//    }
 
     fun addPlayerToRoom(newPlayer: Player, room: Room, socket: DefaultWebSocketServerSession) {
         GlobalScope.launch {
@@ -41,6 +35,9 @@ class SketchServer {  // DrawingServer todo remove at end
                     room.cancelRemovePlayerJob(player.clientId)
                     playerInRoom.socket = socket  // update the socket of the new connection
                     playerInRoom.startPinging()
+
+                    // Send the drawing data to the re-joining player
+                    room.sendCurRoundDrawDataToPlayer(playerInRoom)
                 }
             }
 
