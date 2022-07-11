@@ -13,7 +13,7 @@ object Constants {
     const val SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT = 50
 
     // Network
-    const val PING_TIMEOUT_LIMIT_MILLIS = 3000L
+    const val PING_TIMEOUT_LIMIT_MILLIS = 300000L
 
     const val QUERY_PARAMETER_CLIENT_ID = "clientId"
 }

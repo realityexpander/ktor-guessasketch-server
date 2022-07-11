@@ -3,6 +3,7 @@ package com.realityexpander
 import com.realityexpander.common.ClientId
 import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
 import com.realityexpander.common.RoomName
+import com.realityexpander.data.models.socket.Announcement
 import com.realityexpander.game.Player
 import com.realityexpander.game.Room
 import io.ktor.websocket.*
@@ -31,13 +32,20 @@ class SketchServer {  // DrawingServer todo remove at end
                 //   and remove the "player exit" job.
                 val playerInRoom = room.getPlayerByClientId(newPlayer.clientId)
 
-                playerInRoom?.let { player ->
-                    room.cancelRemovePlayerJob(player.clientId)
-                    playerInRoom.socket = socket  // update the socket of the new connection
-                    playerInRoom.startPinging()
+                playerInRoom?.let { rejoiningPlayer ->
+                    room.cancelRemovePlayerJob(rejoiningPlayer.clientId)
+                    rejoiningPlayer.socket = socket  // update the socket of the new connection
+                    rejoiningPlayer.startPinging()
 
                     // Send the drawing data to the re-joining player
-                    room.sendCurRoundDrawDataToPlayer(playerInRoom)
+                    room.sendCurRoundDrawDataToPlayer(rejoiningPlayer)
+
+                    // Send announcement to all players that player rejoined
+                    val announcement = Announcement( "Player '${rejoiningPlayer.playerName}' has re-joined the room",
+                        System.currentTimeMillis(),
+                        Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
+                    )
+                    room.broadcast(gson.toJson(announcement))
                 }
             }
 

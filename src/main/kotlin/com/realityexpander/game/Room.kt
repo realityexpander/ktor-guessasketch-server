@@ -456,12 +456,12 @@ class Room(
         curRoundDrawData = curRoundDrawData + drawDataJson
     }
 
-    // Send the serialized drawing data to all the players
+    // Send the serialized drawing data to one players
     suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
         if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
             gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
         ) {
-            sendToOnePlayer(gson.toJson(curRoundDrawData), player)
+            sendToOnePlayer(gson.toJson(CurRoundDrawData(curRoundDrawData)), player)
         }
     }
 
@@ -629,7 +629,7 @@ class Room(
 
         // Tell all players that a player left
         val announcement = Announcement(
-            message = "Player ${playerToRemove.playerName} has left the room.",
+            message = "Player '${playerToRemove.playerName}' has left the room.",
             timestamp = System.currentTimeMillis(),
             announcementType = ANNOUNCEMENT_PLAYER_EXITED_ROOM
         )
