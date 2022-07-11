@@ -8,6 +8,7 @@ import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
 import com.realityexpander.data.ExitingPlayer
 import com.realityexpander.data.models.socket.*
+import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_GENERAL_MESSAGE
 import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_PLAYER_EXITED_ROOM
 import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_DOWN
 import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_UP
@@ -622,6 +623,12 @@ class Room(
                 // Check if there are no players
                 if(players.isEmpty()) {
                     println("removePlayer - No players left in the room, killing the room")
+
+                    broadcast(gson.toJson(Announcement(
+                        message = "No players left, The room has been killed.",
+                        timestamp = System.currentTimeMillis(),
+                        announcementType = ANNOUNCEMENT_GENERAL_MESSAGE
+                    )))
 
                     killRoom()
                 }
