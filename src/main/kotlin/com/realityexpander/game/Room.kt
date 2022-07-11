@@ -21,30 +21,13 @@ import java.util.concurrent.ConcurrentHashMap
 const val ONE_PLAYER = 1
 const val TWO_PLAYERS = 2
 
+const val TIMER_UPDATE_FREQUENCY_MILLIS = 1000L
+
 class Room(
     val roomName: RoomName,
     val maxPlayers: Int,
     var players: List<Player> = listOf(),
 ) {
-
-    enum class GamePhase {
-        INITIAL_STATE,       // no state yet.
-        WAITING_FOR_PLAYERS,
-        WAITING_FOR_START,
-        NEW_ROUND,
-        ROUND_IN_PROGRESS,  // game_running  // todo remove at end
-        ROUND_ENDED,  // show_word // todo remove at end
-    }
-
-    companion object {
-        const val TIMER_UPDATE_FREQUENCY_MILLIS = 1000L
-
-        const val DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS = 10000L
-        const val DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS = 20000L
-        const val DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS = 10000L
-        const val DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS = 10000L
-    }
-
     private var timerJob: Job? = null
     private var drawingPlayer: Player? = null
     private var winningPlayers = listOf<Player>()
@@ -64,35 +47,34 @@ class Room(
     ////// GAME STATE MACHINE ///////
 
     init {
-
-        // When the gamePhase is set, this listener calls the appropriate func
+        // When a new gamePhaseUpdate is set, this listener calls the appropriate func
         setGamePhaseChangeListener { newGamePhase ->
             when(newGamePhase) {
-                GamePhase.INITIAL_STATE -> { /* do nothing */ }
-                GamePhase.WAITING_FOR_PLAYERS -> waitingForPlayersPhase()
-                GamePhase.WAITING_FOR_START -> waitingForStartPhase()
-                GamePhase.NEW_ROUND -> newRoundPhase()
-                GamePhase.ROUND_IN_PROGRESS -> roundInProgressPhase()
-                GamePhase.ROUND_ENDED -> roundEndedPhase()
+                GamePhaseUpdate.GamePhase.INITIAL_STATE -> { /* do nothing */ }
+                GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS -> waitingForPlayersPhase()
+                GamePhaseUpdate.GamePhase.WAITING_FOR_START -> waitingForStartPhase()
+                GamePhaseUpdate.GamePhase.NEW_ROUND -> newRoundPhase()
+                GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS -> roundInProgressPhase()
+                GamePhaseUpdate.GamePhase.ROUND_ENDED -> roundEndedPhase()
                 else -> {}
             }
         }
     }
 
     // Change game phase to a new phase and call the phase change function
-    private var gamePhaseChangeListener: ((GamePhase) -> Unit)? = null
-    var gamePhase = GamePhase.INITIAL_STATE
+    private var gamePhaseChangeListener: ((GamePhaseUpdate.GamePhase) -> Unit)? = null
+    var gamePhase = GamePhaseUpdate.GamePhase.INITIAL_STATE
         private set(newGamePhase) {
             synchronized(field) {  // to allow for concurrent access
                 field = newGamePhase
                 println("Changing game phase to --> $newGamePhase")
-                gamePhaseChangeListener?.let { gamePhaseFunction ->
-                    gamePhaseFunction(newGamePhase)  // set the next phase of the game
+                gamePhaseChangeListener?.let { gamePhaseChange ->
+                    gamePhaseChange(newGamePhase)  // set the next phase of the game
                 }
             }
         }
 
-    private fun setGamePhaseChangeListener(listener: (GamePhase) -> Unit) {
+    private fun setGamePhaseChangeListener(listener: (GamePhaseUpdate.GamePhase) -> Unit) {
         gamePhaseChangeListener = listener
     }
 
@@ -100,21 +82,21 @@ class Room(
     /// GAME PHASES ///
 
     // Waiting for more than 1 player to join the room
-    private fun waitingForPlayersPhase(){
+    private fun waitingForPlayersPhase() {
         GlobalScope.launch {
+
+            // Since this phase has indeterminate duration, we just send the message here.
             val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase = GamePhase.WAITING_FOR_PLAYERS
+                gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS
             )
             broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
     // Waiting for more players to join the room
-    private fun waitingForStartPhase(){
+    private fun waitingForStartPhase() {
         GlobalScope.launch {
-            startGamePhaseCountdownTimerAndNotifyPlayers(
-                DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
-            )
+            startGamePhaseCountdownTimerAndNotifyPlayers()
         }
     }
 
@@ -130,7 +112,7 @@ class Room(
 
         // Send the list of words to guess to the drawing player to pick one
         GlobalScope.launch {
-            startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS)
+            startGamePhaseCountdownTimerAndNotifyPlayers()
 
             // Send the drawing player the list of words to pick from
             sendToOnePlayer(gson.toJson(wordsToPickHolder), drawingPlayer)
@@ -178,15 +160,13 @@ class Room(
                 drawingPlayer
             )
 
-            startGamePhaseCountdownTimerAndNotifyPlayers(
-                DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
-            )
+            startGamePhaseCountdownTimerAndNotifyPlayers()
 
             println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
                     " ┡--> drawingPlayer: '${drawingPlayer?.playerName!!}'\n" +
                     " ┡--> wordToGuess to drawingPlayer: '$wordToGuessToSendDrawingPlayer'\n" +
                     " ┡--> wordToGuess to guessing players: '$wordToGuessToSendAsUnderscores'\n" +
-                    " ┕--> Countdown Timer set to ${DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS / 1000} seconds\n")
+                    " ┕--> Countdown Timer set to ${gamePhase.phaseDurationMillis / 1000} seconds\n")
 
             // Announce to players to guess now!
             broadcast(gson.toJson(Announcement(
@@ -231,13 +211,13 @@ class Room(
             // Score has possibly changed
             broadcastAllPlayersData()
 
-            startGamePhaseCountdownTimerAndNotifyPlayers(DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS)
-            val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase = GamePhase.ROUND_ENDED,
-                DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
-            )
-
-            broadcast(gson.toJson(gamePhaseUpdate))
+            startGamePhaseCountdownTimerAndNotifyPlayers()
+//            val gamePhaseUpdate = GamePhaseUpdate(
+//                gamePhase = GamePhaseUpdate.GamePhase.ROUND_ENDED,
+//                countdownTimerMillis = gamePhase.phaseDurationMillis
+//            )
+//
+//            broadcast(gson.toJson(gamePhaseUpdate))
         }
     }
 
@@ -245,7 +225,7 @@ class Room(
 
     fun drawingPlayerSetWordToGuessAndStartRound(wordToGuess: String) {
         this.wordToGuess = wordToGuess
-        gamePhase = GamePhase.ROUND_IN_PROGRESS
+        gamePhase = GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS
     }
 
     fun proceedToNextDrawingPlayer() {
@@ -279,7 +259,7 @@ class Room(
         return guessChatMessage.containsWord(wordToGuess ?: return false)
                 && !winningPlayers.containsPlayerClientId(guessChatMessage.fromClientId)
                 && guessChatMessage.fromClientId != drawingPlayer?.clientId
-                && gamePhase == GamePhase.ROUND_IN_PROGRESS
+                && gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS
     }
 
     // Returns true if all the players have guessed the word and the round is over
@@ -287,7 +267,7 @@ class Room(
         winningPlayers = winningPlayers + player
 
         if(winningPlayers.size == players.size - 1) {
-            gamePhase = GamePhase.ROUND_ENDED
+            gamePhase = GamePhaseUpdate.GamePhase.ROUND_ENDED
             return true
         }
 
@@ -302,7 +282,7 @@ class Room(
             // Calc score for winning player
             val guessTimeMillis = System.currentTimeMillis() - gamePhaseStartTimeMillis
             val percentTimeLeft = 1f -
-                    (guessTimeMillis / DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS.toFloat())
+                    (guessTimeMillis / gamePhase.phaseDurationMillis.toFloat())
             val score = SCORE_GUESS_CORRECT_DEFAULT +
                     (SCORE_GUESS_CORRECT_MULTIPLIER * percentTimeLeft).toInt()
             winningPlayer.score += score
@@ -344,13 +324,8 @@ class Room(
     // When a player joins a room (connect or reconnects)
     // Inform the player of the word to guess and the current phase
     suspend fun sendWordToGuessToPlayer(player: Player) {
-        val delay = when(gamePhase) {
-            GamePhase.WAITING_FOR_START -> DELAY_WAITING_FOR_START_TO_NEW_ROUND_MILLIS
-            GamePhase.NEW_ROUND -> DELAY_NEW_ROUND_TO_ROUND_IN_PROGRESS_MILLIS
-            GamePhase.ROUND_IN_PROGRESS -> DElAY_ROUND_IN_PROGRESS_TO_ROUND_ENDED_MILLIS
-            GamePhase.ROUND_ENDED -> DELAY_ROUND_ENDED_TO_NEW_ROUND_MILLIS
-            else -> 0L
-        }
+
+        val delay = gamePhase.phaseDurationMillis
 
         // Send the current phase and the drawing player
         val gamePhaseUpdate = GamePhaseUpdate(gamePhase, delay, drawingPlayer?.playerName)
@@ -362,7 +337,7 @@ class Room(
                 val gameState = GameState(
                     drawingPlayer.playerName,
                     drawingPlayer.clientId,
-                    if(player.isDrawing || gamePhase == GamePhase.ROUND_ENDED) {
+                    if(player.isDrawing || gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED) {
                         curWordToGuess
                     } else {
                         curWordToGuess.transformToUnderscores()
@@ -399,7 +374,12 @@ class Room(
     // 4. Notify the players that the phase has ended
     // 5. Proceed to the next phase of the game
     // timeAndNotify  todo remove at end
-    private fun startGamePhaseCountdownTimerAndNotifyPlayers(gamePhaseDurationMillis: Long) {
+    private fun startGamePhaseCountdownTimerAndNotifyPlayers() {
+
+        // If its indeterminate duration, no need for the timer.
+        if(gamePhase.phaseDurationMillis == GamePhaseUpdate.INDETERMINATE_DURATION_MILLIS) {
+            return
+        }
 
         timerJob?.cancel()
         timerJob = GlobalScope.launch {
@@ -408,7 +388,8 @@ class Room(
             gamePhaseStartTimeMillis = System.currentTimeMillis()
             val gamePhaseUpdate = GamePhaseUpdate(
                 gamePhase,  // change to new phase of the game
-                gamePhaseDurationMillis,
+                //gamePhaseDurationMillis,
+                gamePhase.phaseDurationMillis,
                 drawingPlayer?.playerName
             )
 
@@ -416,7 +397,7 @@ class Room(
             broadcast(gson.toJson(gamePhaseUpdate))
 
             // Send players the current countdown time
-            repeat( (gamePhaseDurationMillis / TIMER_UPDATE_FREQUENCY_MILLIS).toInt() ) { count ->
+            repeat( (gamePhase.phaseDurationMillis / TIMER_UPDATE_FREQUENCY_MILLIS).toInt() ) { count ->
 
                 // Notify the players of the current countdown time for this game phase
                 if(count != 0) {
@@ -440,20 +421,20 @@ class Room(
 
     private suspend fun proceedToNextGamePhase() {
         gamePhase = when (gamePhase) {
-            GamePhase.WAITING_FOR_START ->
-                GamePhase.NEW_ROUND
-            GamePhase.ROUND_IN_PROGRESS -> {
+            GamePhaseUpdate.GamePhase.WAITING_FOR_START ->
+                GamePhaseUpdate.GamePhase.NEW_ROUND
+            GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS -> {
                 finishOffDrawing()  // make sure the drawing is finished
-                GamePhase.ROUND_ENDED
+                GamePhaseUpdate.GamePhase.ROUND_ENDED
             }
-            GamePhase.ROUND_ENDED ->
-                GamePhase.NEW_ROUND
-            GamePhase.NEW_ROUND -> {
+            GamePhaseUpdate.GamePhase.ROUND_ENDED ->
+                GamePhaseUpdate.GamePhase.NEW_ROUND
+            GamePhaseUpdate.GamePhase.NEW_ROUND -> {
                 wordToGuess = null  // reset the word to guess to force a new word to be picked
-                GamePhase.ROUND_IN_PROGRESS
+                GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS
             }
             else ->
-                GamePhase.WAITING_FOR_PLAYERS
+                GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS
         }
     }
 
@@ -478,7 +459,9 @@ class Room(
 
     // Send the serialized drawing data to all the players
     private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
-        if(gamePhase == GamePhase.ROUND_IN_PROGRESS || gamePhase == GamePhase.ROUND_ENDED) {
+        if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
+            gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
+        ) {
             sendToOnePlayer(gson.toJson(curRoundDrawData), player)
         }
     }
@@ -543,18 +526,18 @@ class Room(
 
         // Only player in the room?  -> keep waiting for more players
         if (players.size == ONE_PLAYER) {
-            gamePhase = GamePhase.WAITING_FOR_PLAYERS
+            gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS
         }
 
         // Two players in the room?  -> ready to start the game
-        if (players.size == TWO_PLAYERS && gamePhase == GamePhase.WAITING_FOR_PLAYERS) {
-            gamePhase = GamePhase.WAITING_FOR_START
+        if (players.size == TWO_PLAYERS && gamePhase == GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS) {
+            gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_START
             players = players.shuffled()
         }
 
         // Max number of players in the room?  -> start the game
-        if (players.size == maxPlayers && gamePhase == GamePhase.WAITING_FOR_START) {
-            gamePhase = GamePhase.NEW_ROUND
+        if (players.size == maxPlayers && gamePhase == GamePhaseUpdate.GamePhase.WAITING_FOR_START) {
+            gamePhase = GamePhaseUpdate.GamePhase.NEW_ROUND
             players = players.shuffled()
         }
 
@@ -593,7 +576,8 @@ class Room(
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
             //players = players - player // phillip mistake? todo remove at end
 
-            println("removePlayer delayed ${PLAYER_EXIT_REMOVE_DELAY_MILLIS/1000L} seconds, player: ${playerToRemove.playerName}")
+            println("removePlayer delayed ${PLAYER_EXIT_REMOVE_DELAY_MILLIS/1000L} seconds, " +
+                    "player: ${playerToRemove.playerName}")
 
             // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_DELAY_MILLIS from now.
             playerRemoveJobs[removeClientId] = GlobalScope.launch {
@@ -616,7 +600,7 @@ class Room(
                 if(players.size == 1) {
                     println("removePlayer - Only one player, changing to phase WAITING_FOR_PLAYERS")
 
-                    gamePhase = GamePhase.WAITING_FOR_PLAYERS
+                    gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS
                     timerJob?.cancel()
                 }
 

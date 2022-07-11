@@ -3,7 +3,6 @@ package com.realityexpander.routes
 import com.google.gson.JsonParser
 import com.realityexpander.common.ClientId
 import com.realityexpander.game.Player
-import com.realityexpander.game.Room
 import com.realityexpander.data.models.socket.*
 import com.realityexpander.gson
 import com.realityexpander.serverDB
@@ -53,8 +52,8 @@ fun Route.gameWebSocketRoute() {
                     //        "   ⎿__ messageJson: $messageJson"
                     //)
 
-                    if( room.gamePhase == Room.GamePhase.ROUND_IN_PROGRESS ||
-                        room.gamePhase == Room.GamePhase.ROUND_ENDED
+                    if( room.gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
+                        room.gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
                     ) {
                         room.broadcastToAllExceptOneClientId(messageJson, clientId)
                         room.addSerializedDrawDataJson(messageJson)
