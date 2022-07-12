@@ -104,7 +104,7 @@ data class Player(
 
             // Cancel the RemovePlayerJob
             val room = serverDB.getRoomForPlayerClientId(clientId)
-            room?.cancelRemovePlayerPermanentlyJob(clientId)
+            room?.cancelRemovePlayerPermanently(clientId)
         }
 
         setIsOnline(true)

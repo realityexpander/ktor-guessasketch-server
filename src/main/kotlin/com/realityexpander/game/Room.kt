@@ -497,42 +497,46 @@ class Room(
                 playerRemovePermanentlyJobs.remove(clientId)
                 exitingPlayers.remove(clientId)
 
-
                 // Send the drawing data to the re-joining player
                 sendCurRoundDrawDataToPlayer(rejoinedPlayer)
 
                 // Modify join message
                 joinMessage = "re-joined"
 
-                println("Player '${rejoinedPlayer.playerName}' has rejoined the room.")
+                println("Player '${rejoinedPlayer.playerName}' has re-joined room '$roomName'")
 
                 rejoinedPlayer
             } ?: throw IllegalStateException("Rejoining player was null")
         } else {
             // This is a new player
-            println("Player '$playerName' has joined the room.")
+            println("Player '$playerName' has joined room '$roomName'")
 
             Player(playerName, socketSession, clientId)
         }
 
         newPlayer.startPinging()
 
-        // Check if the index where to add the player is in bounds.
-        //   (in case other players have also disconnected and the list is smaller than when the player joined.)
-        indexToAddPlayerAt =
-            when {
-                players.isEmpty()                   -> 0
-                indexToAddPlayerAt >= players.size  -> players.size - 1
-                else                                -> indexToAddPlayerAt
-            }
+        // If player is not currently in room, update the players list and put them back in the correct position
+        if (players.containsPlayerClientId(clientId)) {
+            println("Player '$playerName' is already in room '$roomName'")
+        } else {
+            // Check if the index where to add the player is in bounds.
+            //   (in case other players have also disconnected and the list is smaller than when the player joined.)
+            indexToAddPlayerAt =
+                when {
+                    players.isEmpty()                   -> 0
+                    indexToAddPlayerAt >= players.size  -> players.size - 1
+                    else                                -> indexToAddPlayerAt
+                }
 
-        // Insert the new player at the particular index
-        val tmpPlayers = players.toMutableList()
-        tmpPlayers.add(indexToAddPlayerAt, newPlayer)
+            // Insert the new player at the particular index
+            val tmpPlayers = players.toMutableList()
+            tmpPlayers.add(indexToAddPlayerAt, newPlayer)
 
-        // we use `x = x + y` instead of `x+=y`, because we want to
-        //   use a copy of the immutable list to work in concurrent environments.
-        players = tmpPlayers.toList() // convert back to an immutable list
+            // we use `x = x + y` instead of `x+=y`, because we want to
+            //   use a copy of the immutable list to work in concurrent environments.
+            players = tmpPlayers.toList() // convert back to an immutable list
+        }
 
 
         // Only player in the room?  -> keep waiting for more players
@@ -585,14 +589,16 @@ class Room(
 
             // Add player to exiting list
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
-            //players = players - player // phillip mistake? todo remove at end
 
-            println("removePlayer - permanent removal delayed ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
+            // Remove the player from the room
+            players = players - playerToRemove
+
+            println("removePlayer - permanent removal scheduled in ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
                     "for player: '${playerToRemove.playerName}'")
             println("removePlayer - list of exitingPlayers: ")
             exitingPlayers.forEach { (_, u) -> println(" ┡--> ${u.player.playerName}\n") }
 
-            // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_DELAY_MILLIS from now.
+            // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS from now.
             playerRemovePermanentlyJobs[removeClientId] = GlobalScope.launch {
                 delay(PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS)  // will be cancelled if the player re-joins
 
@@ -601,7 +607,7 @@ class Room(
                 val removePlayer = exitingPlayers[removeClientId]
 
                 // remove this player from the exitingPlayers list
-                exitingPlayers.remove(removeClientId)
+                exitingPlayers -= removeClientId
 
                 // FINALLY permanently remove the player from the room
                 removePlayer?.let { exitingPlayer ->
@@ -658,9 +664,10 @@ class Room(
         }
     }
 
-    fun cancelRemovePlayerPermanentlyJob(clientId: ClientId) {
+    fun cancelRemovePlayerPermanently(clientId: ClientId) {
         playerRemovePermanentlyJobs[clientId]?.cancel()
         playerRemovePermanentlyJobs -= clientId
+        exitingPlayers -= clientId
 
         println("cancelRemovePlayerPermanentlyJob: cancelled job for player: ${getPlayerByClientId(clientId)?.playerName}")
     }

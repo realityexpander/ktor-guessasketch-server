@@ -42,7 +42,7 @@ fun Route.gameWebSocketRoute() {
                     // Add player to room
                     serverDB.addPlayerToRoom(newPlayer, room, socket)
 
-                    println("Player '${newPlayer.playerName}' joined room '${room.roomName}'")
+                    println("Player '${newPlayer.playerName}' performed JoinRoomHandshake for room '${room.roomName}'")
                 }
                 is DrawData -> {
                     val room = serverDB.roomsDB[payload.roomName] ?: return@standardWebSocket
