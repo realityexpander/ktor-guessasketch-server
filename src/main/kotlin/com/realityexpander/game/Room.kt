@@ -482,7 +482,7 @@ class Room(
         var indexToAddPlayerAt = players.size - 1
         var joinMessage = "joined"
 
-        // Check if this is a rejoining player
+        // Check if this is a re-joining player
         val newPlayer = if(exitingPlayers.containsKey(clientId)) {
             val rejoiningPlayer = exitingPlayers[clientId]
 

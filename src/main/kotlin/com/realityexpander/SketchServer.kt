@@ -17,40 +17,11 @@ class SketchServer {  // DrawingServer todo remove at end
 
     fun addPlayerToRoom(newPlayer: Player, room: Room, socket: DefaultWebSocketServerSession) {
         GlobalScope.launch {
-            // Add the player to the server
+            // Add the player to the server DB
             addPlayerToServerDB(newPlayer)
 
-            // Add player to room (if not already in room (not re-joining))
-            //if (!room.containsPlayerClientId(newPlayer.clientId)) {
-                room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
-            //    newPlayer.startPinging()
-//            } else {
-//                // Player has disconnected then quickly reconnected,
-//                //   so just update the socket
-//                //   and remove the "player exit" job.
-//
-//                // Find the player in the room they are re-joining
-//                val playerInRoom = room.getPlayerByClientId(newPlayer.clientId)
-//
-//                playerInRoom?.let { rejoiningPlayer ->
-//                    room.cancelRemovePlayerJob(rejoiningPlayer.clientId)
-//                    rejoiningPlayer.socket = socket  // update the socket of the new connection
-//                    rejoiningPlayer.startPinging()
-//
-//                    // Send the drawing data to the re-joining player
-//                    room.sendCurRoundDrawDataToPlayer(rejoiningPlayer)
-//
-//                    // Send announcement to all players that player rejoined
-//                    val announcement = Announcement( "Player '${rejoiningPlayer.playerName}' has re-joined the room",
-//                        System.currentTimeMillis(),
-//                        Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
-//                    )
-//                    room.broadcast(gson.toJson(announcement))
-//
-//                    println("addPlayerToRoom - Player '${rejoiningPlayer.playerName}' has re-joined the room")
-//                }
-//            }
-
+            // Add player to room (will check for re-joining))
+            room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
             println("addPlayerToRoom - roomsDB=$roomsDB, playersDB=$playersDB")
         }
     }

@@ -26,7 +26,7 @@ data class Player(
     )
 
     companion object {
-        // note: only atomic references held in companion objects can be seen AND updated by multiple threads
+        // note: only atomic references held in companion objects (or regular objects?) can be read AND modified by multiple threads
         val atomicMapOfClientToPingTime = AtomicReference<MutableMap<ClientId, OnlinePingPongTime>>(mutableMapOf())
     }
 
@@ -97,19 +97,22 @@ data class Player(
         //                " ┡--- clientId=${this@Player.clientId})"
         //    )
 
-        // If player starts responding to ping again, they are back online.
-        // This is if the socket connection was not broken and there was too much network traffic.
+        // If player responds to the last ping, they are still online.
+        // This happens if the socket connection was not broken and there was too much network traffic and pong
+        //   was received more than PING_TIMEOUT_LIMIT_MILLIS milliseconds ago, ie: very late.
+        // This is unlikely to happen, but it is possible.
         if(!isOnline()) {
             println("Player '$playerName' is back online")
 
-            // Cancel the RemovePlayerJob
+            // Add the player back to the room
             val room = serverDB.getRoomForPlayerClientId(clientId)
-            room?.cancelRemovePlayerPermanently(clientId)
+            GlobalScope.launch {
+                room?.addPlayer(clientId, playerName, socket)
+            }
         }
 
         setIsOnline(true)
     }
-
 
     fun stopPinging() {
         pingJob?.cancel()
