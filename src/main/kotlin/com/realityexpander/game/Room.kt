@@ -602,7 +602,7 @@ class Room(
             playerRemovePermanentlyJobs[removeClientId] = GlobalScope.launch {
                 delay(PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS)  // will be cancelled if the player re-joins
 
-                println("removePlayer - player ${playerToRemove.playerName} has been permanently removed")
+                println("removePlayer - player '${playerToRemove.playerName}' has been PERMANENTLY removed")
 
                 val removePlayer = exitingPlayers[removeClientId]
 
@@ -613,6 +613,9 @@ class Room(
                 removePlayer?.let { exitingPlayer ->
                     players = players - exitingPlayer.player
                 }
+
+                // Remove the player from the server
+                serverDB.removePlayerFromServerDB(removeClientId)
 
                 // remove this job
                 playerRemovePermanentlyJobs -= removeClientId
@@ -643,7 +646,7 @@ class Room(
             }
         } else {
             // Removing Player Immediately
-            println("removePlayer - Removing player ${playerToRemove.playerName} IMMEDIATELY")
+            println("removePlayer - IMMEDIATELY Removing player ${playerToRemove.playerName}")
 
             // Remove the player from this room
             players = players - playerToRemove

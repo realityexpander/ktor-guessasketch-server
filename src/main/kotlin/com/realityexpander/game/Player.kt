@@ -44,7 +44,7 @@ data class Player(
     }
 
     private suspend fun sendPing() {
-        // Set the ping time for this client
+        // Set the ping start time for this client
         val pingTimeMillis = System.currentTimeMillis()
         setPingTimeMillis(pingTimeMillis)
 
@@ -54,7 +54,7 @@ data class Player(
 
         delay(PING_TIMEOUT_LIMIT_MILLIS)  // wait for response
 
-        // Get the pong time for this client
+        // Get the pong "turnaround" time for this client
         val pongTimeMillis = getPongTimeMillis()
 
         println(
