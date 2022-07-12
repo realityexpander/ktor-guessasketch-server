@@ -6,10 +6,8 @@ import com.realityexpander.data.models.socket.Ping
 import com.realityexpander.gson
 import com.realityexpander.serverDB
 import io.ktor.http.cio.websocket.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import java.util.concurrent.atomic.AtomicReference
 
 data class Player(
     val playerName: String,
@@ -21,41 +19,142 @@ data class Player(
 ) {
     private var pingJob: Job? = null
 
-    private var pingTimeMillis = 0L  // send ping
-    private var pongTimeMillis = 0L  // receive ping
+    data class OnlinePingPongTime(
+        var pingTimeMillis: Long = 0L,
+        var pongTimeMillis: Long = 0L,
+        var isOnline: Boolean = true,
+    )
 
-    var isOnline = true
+    companion object {
+        // note: only atomic references held in companion objects can be seen AND updated by multiple threads
+        val atomicMapOfClientToPingTime = AtomicReference<MutableMap<ClientId, OnlinePingPongTime>>(mutableMapOf())
+    }
 
     fun startPinging() {
-        pingJob?.cancel() // cancel previous job, if any
+        // println("startPinging for $playerName")
 
+        stopPinging() // cancel previous job, if any
         pingJob = GlobalScope.launch {
-            while(true) {
+            while (true) {
                 sendPing()
-                delay(PING_TIMEOUT_LIMIT_MILLIS)
+
+                delay(PING_TIMEOUT_LIMIT_MILLIS)  // a little breathing room between pings
             }
         }
     }
 
     private suspend fun sendPing() {
-        pingTimeMillis = System.currentTimeMillis()
+        // Set the ping time for this client
+        val pingTimeMillis = System.currentTimeMillis()
+        setPingTimeMillis(pingTimeMillis)
+
         socket.send(Frame.Text(gson.toJson(Ping())))
+        println("Player '$playerName' SENT ping\n" +
+                " ┡--- pingTime=${pingTimeMillis}")
 
         delay(PING_TIMEOUT_LIMIT_MILLIS)  // wait for response
 
-        if(pingTimeMillis - pongTimeMillis > PING_TIMEOUT_LIMIT_MILLIS) {
-            isOnline = false
-            serverDB.removePlayerFromRoom(clientId)
-            pingJob?.cancel()
+        // Get the pong time for this client
+        val pongTimeMillis = getPongTimeMillis()
+
+        println(
+            "Player '$playerName' TURNAROUND for ping->pong\n" +
+                    " ┡--- pong-ping turnaround : ${pongTimeMillis - pingTimeMillis}ms\n"
+//                  +
+//                    " ┡--- last ping sent at    : ${pingTimeMillis},\n" +
+//                    " ┡--- last pong received at: ${pongTimeMillis}\n" +
+//                    " ┡--- last ping sent       : ${System.currentTimeMillis() - pingTimeMillis}ms ago\n" +
+//                    " ┡--- last pong received   : ${System.currentTimeMillis() - pongTimeMillis}ms ago\n" +
+//                    " ┡--- Online?              : ${isOnline()}\n" +
+//                    " ┡--- clientId=${this@Player.clientId}"
+        )
+
+        // Check for timeout
+        if (pongTimeMillis - pingTimeMillis > PING_TIMEOUT_LIMIT_MILLIS) {
+            if (isOnline()) {
+                println("Player '$playerName' is OFFLINE - no ping received in over ${PING_TIMEOUT_LIMIT_MILLIS}ms\n")
+
+                setIsOnline(false)
+
+                serverDB.scheduleRemovePlayerFromRoom(clientId)
+                stopPinging()  // not needed? do we want to keep pinging until the player is back online or removed permanently
+            }
         }
     }
 
     fun receivedPong() {
-        pongTimeMillis = System.currentTimeMillis()
-        isOnline = true
+        val pingTimeMillis = getPingTimeMillis()
+
+        // set the pong time for this client
+        val pongTimeMillis = System.currentTimeMillis()
+        setPongTimeMillis(pongTimeMillis)
+
+        //    println(
+        //        "Player '$playerName' RECEIVED pong \n" +
+        //                " ┡--- pingTime=${pingTimeMillis} \n" +
+        //                " ┡--- pongTime=${pongTimeMillis} \n" +
+        //                " ┡--- turnaround time: ${pongTimeMillis - pingTimeMillis}ms\n" +
+        //                " ┡--- clientId=${this@Player.clientId})"
+        //    )
+
+        // If player starts responding to ping again, they are back online.
+        // This is if the socket connection was not broken and there was too much network traffic.
+        if(!isOnline()) {
+            println("Player '$playerName' is back online")
+
+            // Cancel the RemovePlayerJob
+            val room = serverDB.getRoomForPlayerClientId(clientId)
+            room?.cancelRemovePlayerPermanentlyJob(clientId)
+        }
+
+        setIsOnline(true)
     }
+
 
     fun stopPinging() {
         pingJob?.cancel()
+    }
+
+
+    //// UTILITIES ////
+
+    fun isOnline(): Boolean {
+        return atomicMapOfClientToPingTime.get().getValue(clientId).isOnline
+    }
+
+    private fun setIsOnline(isOnline: Boolean) {
+        atomicMapOfClientToPingTime.getAndUpdate { map ->
+            map[clientId] = map[clientId]?.copy(isOnline = isOnline)
+                ?: OnlinePingPongTime(isOnline = isOnline)
+            map
+        }
+    }
+
+    fun getPingPongTime(): OnlinePingPongTime {
+        return atomicMapOfClientToPingTime.get().getValue(clientId)
+    }
+
+    private fun getPingTimeMillis(): Long {
+        return atomicMapOfClientToPingTime.get().getValue(clientId).pingTimeMillis
+    }
+
+    private fun getPongTimeMillis(): Long {
+        return atomicMapOfClientToPingTime.get().getValue(clientId).pongTimeMillis
+    }
+
+    private fun setPingTimeMillis(pingTimeMillis: Long) {
+        atomicMapOfClientToPingTime.getAndUpdate { map ->
+            map[clientId] = map[clientId]?.copy(pingTimeMillis = pingTimeMillis)
+                ?: OnlinePingPongTime(pingTimeMillis = pingTimeMillis)
+            map
+        }
+    }
+
+    private fun setPongTimeMillis(pongTimeMillis: Long) {
+        atomicMapOfClientToPingTime.getAndUpdate { map ->
+            map[clientId] = map[clientId]?.copy(pongTimeMillis = pongTimeMillis)
+                ?: OnlinePingPongTime(pongTimeMillis = pongTimeMillis)
+            map
+        }
     }
 }

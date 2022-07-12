@@ -1,9 +1,7 @@
 package com.realityexpander
 
 import com.realityexpander.common.ClientId
-import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
 import com.realityexpander.common.RoomName
-import com.realityexpander.data.models.socket.Announcement
 import com.realityexpander.game.Player
 import com.realityexpander.game.Room
 import io.ktor.websocket.*
@@ -22,43 +20,48 @@ class SketchServer {  // DrawingServer todo remove at end
             // Add the player to the server
             addPlayerToServerDB(newPlayer)
 
-            // Add player to room
-            if (!room.containsPlayerClientId(newPlayer.clientId)) {
+            // Add player to room (if not already in room (not re-joining))
+            //if (!room.containsPlayerClientId(newPlayer.clientId)) {
                 room.addPlayer(newPlayer.clientId, newPlayer.playerName, newPlayer.socket)
-                newPlayer.startPinging()
-            } else {
-                // Player has disconnected then quickly reconnected,
-                //   so just update the socket
-                //   and remove the "player exit" job.
-                val playerInRoom = room.getPlayerByClientId(newPlayer.clientId)
+            //    newPlayer.startPinging()
+//            } else {
+//                // Player has disconnected then quickly reconnected,
+//                //   so just update the socket
+//                //   and remove the "player exit" job.
+//
+//                // Find the player in the room they are re-joining
+//                val playerInRoom = room.getPlayerByClientId(newPlayer.clientId)
+//
+//                playerInRoom?.let { rejoiningPlayer ->
+//                    room.cancelRemovePlayerJob(rejoiningPlayer.clientId)
+//                    rejoiningPlayer.socket = socket  // update the socket of the new connection
+//                    rejoiningPlayer.startPinging()
+//
+//                    // Send the drawing data to the re-joining player
+//                    room.sendCurRoundDrawDataToPlayer(rejoiningPlayer)
+//
+//                    // Send announcement to all players that player rejoined
+//                    val announcement = Announcement( "Player '${rejoiningPlayer.playerName}' has re-joined the room",
+//                        System.currentTimeMillis(),
+//                        Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
+//                    )
+//                    room.broadcast(gson.toJson(announcement))
+//
+//                    println("addPlayerToRoom - Player '${rejoiningPlayer.playerName}' has re-joined the room")
+//                }
+//            }
 
-                playerInRoom?.let { rejoiningPlayer ->
-                    room.cancelRemovePlayerJob(rejoiningPlayer.clientId)
-                    rejoiningPlayer.socket = socket  // update the socket of the new connection
-                    rejoiningPlayer.startPinging()
-
-                    // Send the drawing data to the re-joining player
-                    room.sendCurRoundDrawDataToPlayer(rejoiningPlayer)
-
-                    // Send announcement to all players that player rejoined
-                    val announcement = Announcement( "Player '${rejoiningPlayer.playerName}' has re-joined the room",
-                        System.currentTimeMillis(),
-                        Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
-                    )
-                    room.broadcast(gson.toJson(announcement))
-                }
-            }
-
-            println("roomsDB=$roomsDB, playersDB=$playersDB")
+            println("addPlayerToRoom - roomsDB=$roomsDB, playersDB=$playersDB")
         }
     }
 
     // Player exiting (either on purpose or a ping timeout) // playerLeft // todo remove at end
-    fun removePlayerFromRoom(removeClientId: ClientId, isImmediateDisconnect: Boolean = false) {
+    fun scheduleRemovePlayerFromRoom(removeClientId: ClientId, isImmediateDisconnect: Boolean = false) {
         // Find the room for the player
         val roomOfPlayer = getRoomForPlayerClientId(removeClientId)
 
-        if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline == false) {
+        //if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline?.get() == false) {  // todo remove soon
+        if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline() == false) {
             println("Now Closing connection to ${playersDB[removeClientId]}")
 
             playersDB[removeClientId]?.stopPinging()

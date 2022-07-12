@@ -88,13 +88,13 @@ fun Route.gameWebSocketRoute() {
                     }
                 }
                 is Ping -> {
-                    // println("Ping received: username=${payload.username}")
+                    //println("Ping received: playerName=${payload.playerName}")
                     serverDB.playersDB[clientId]?.receivedPong()
                 }
                 is DisconnectRequest -> {
                     val room = serverDB.roomsDB[clientId] ?: return@standardWebSocket
 
-                    serverDB.removePlayerFromRoom(clientId, isImmediateDisconnect = true)
+                    serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateDisconnect = true)
                 }
                 else -> {
                     println("Unknown socketType for $payload")
@@ -159,7 +159,8 @@ fun Route.standardWebSocket(
                 }
             // Remove the player
             player?.let {
-                serverDB.removePlayerFromRoom(session.clientId)
+                println("standardWebSocket - Player '${it.playerName}' disconnected")
+                serverDB.scheduleRemovePlayerFromRoom(session.clientId)
             }
 
             //close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Closing")) // needed? remove soon todo

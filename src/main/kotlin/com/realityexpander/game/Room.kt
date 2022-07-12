@@ -1,7 +1,7 @@
 package com.realityexpander.game
 
 import com.realityexpander.common.*
-import com.realityexpander.common.Constants.PLAYER_EXIT_REMOVE_DELAY_MILLIS
+import com.realityexpander.common.Constants.PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS
 import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
@@ -36,7 +36,7 @@ class Room(
     private var gamePhaseStartTimeMillis = 0L  // for score keeping
 
     // Track players removing/reconnecting
-    private var playerRemoveJobs = ConcurrentHashMap<ClientId, Job>()
+    private var playerRemovePermanentlyJobs = ConcurrentHashMap<ClientId, Job>()
     private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()  // leftPlayers todo remove
 
     // Track drawing data
@@ -457,7 +457,7 @@ class Room(
     }
 
     // Send the serialized drawing data to one players
-    suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
+    private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
         if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
             gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
         ) {
@@ -480,29 +480,42 @@ class Room(
 
         // Default behavior is to add the player at the end of the list of players
         var indexToAddPlayerAt = players.size - 1
+        var joinMessage = "joined"
 
         // Check if this is a rejoining player
         val newPlayer = if(exitingPlayers.containsKey(clientId)) {
-
             val rejoiningPlayer = exitingPlayers[clientId]
 
-            // If the player is rejoining, remove it from the exitingPlayers map
+            // If the player is rejoining, remove it from the exitingPlayers list
             rejoiningPlayer?.let { (rejoinedPlayer, indexOfPlayer) ->
                 rejoinedPlayer.socket = socketSession
                 rejoinedPlayer.isDrawing = drawingPlayer?.clientId == clientId  // is this the same as the drawing player?
                 indexToAddPlayerAt = indexOfPlayer
 
                 // Cancel and remove the "Remove Exiting Player After Delay" jobs
-                playerRemoveJobs[clientId]?.cancel()
-                playerRemoveJobs.remove(clientId)
+                playerRemovePermanentlyJobs[clientId]?.cancel()
+                playerRemovePermanentlyJobs.remove(clientId)
                 exitingPlayers.remove(clientId)
 
+
+                // Send the drawing data to the re-joining player
+                sendCurRoundDrawDataToPlayer(rejoinedPlayer)
+
+                // Modify join message
+                joinMessage = "re-joined"
+
+                println("Player '${rejoinedPlayer.playerName}' has rejoined the room.")
+
                 rejoinedPlayer
-            } ?: Player(playerName, socketSession, clientId) // should never get here bc we checked
+            } ?: throw IllegalStateException("Rejoining player was null")
         } else {
             // This is a new player
+            println("Player '$playerName' has joined the room.")
+
             Player(playerName, socketSession, clientId)
         }
+
+        newPlayer.startPinging()
 
         // Check if the index where to add the player is in bounds.
         //   (in case other players have also disconnected and the list is smaller than when the player joined.)
@@ -520,7 +533,6 @@ class Room(
         // we use `x = x + y` instead of `x+=y`, because we want to
         //   use a copy of the immutable list to work in concurrent environments.
         players = tmpPlayers.toList() // convert back to an immutable list
-
 
 
         // Only player in the room?  -> keep waiting for more players
@@ -543,7 +555,7 @@ class Room(
         sendWordToGuessToPlayer(newPlayer)
 
         // Send announcement to all players
-        val announcement = Announcement( "Player '$playerName' has joined the room",
+        val announcement = Announcement( "Player '$playerName' has $joinMessage the room",
             System.currentTimeMillis(),
             Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
         )
@@ -559,10 +571,10 @@ class Room(
     }
 
     // Flow is:
-    // removePlayer(removeImmediately == false)
-    //   -> Add player to exiting List
-    //   -> wait PLAYER_REMOVE_DELAY_MILLIS ms
-    //   -> finally remove player from room & exiting list
+    // removePlayer(when removeImmediately == false)
+    //   -> Add player to exiting player List
+    //   -> wait PLAYER_EXIT_REMOVE_DELAY_MILLIS ms
+    //   -> finally permanently remove player from room & exiting list
     //   -> remove the player from the server
     fun removePlayer(removeClientId: ClientId, isImmediateRemoval: Boolean = false) {
         val playerToRemove = getPlayerByClientId(removeClientId) ?: return
@@ -575,25 +587,32 @@ class Room(
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
             //players = players - player // phillip mistake? todo remove at end
 
-            println("removePlayer delayed ${PLAYER_EXIT_REMOVE_DELAY_MILLIS/1000L} seconds, " +
-                    "player: ${playerToRemove.playerName}")
+            println("removePlayer - permanent removal delayed ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
+                    "for player: '${playerToRemove.playerName}'")
+            println("removePlayer - list of exitingPlayers: ")
+            exitingPlayers.forEach { (_, u) -> println(" ┡--> ${u.player.playerName}\n") }
 
             // Launch the "final" remove player job that will happen in PLAYER_EXIT_REMOVE_DELAY_MILLIS from now.
-            playerRemoveJobs[removeClientId] = GlobalScope.launch {
-                delay(PLAYER_EXIT_REMOVE_DELAY_MILLIS)  // will be cancelled if the player re-joins
+            playerRemovePermanentlyJobs[removeClientId] = GlobalScope.launch {
+                delay(PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS)  // will be cancelled if the player re-joins
+
+                println("removePlayer - player ${playerToRemove.playerName} has been permanently removed")
 
                 val removePlayer = exitingPlayers[removeClientId]
 
-                // remove this player from our exitingPlayers list
+                // remove this player from the exitingPlayers list
                 exitingPlayers.remove(removeClientId)
 
-                // FINALLY remove the player from the room
+                // FINALLY permanently remove the player from the room
                 removePlayer?.let { exitingPlayer ->
                     players = players - exitingPlayer.player
                 }
 
-                // And remove this job
-                playerRemoveJobs -= removeClientId
+                // remove this job
+                playerRemovePermanentlyJobs -= removeClientId
+
+                // Stop pinging
+                removePlayer?.player?.stopPinging()
 
                 // Check if there is only one player
                 if(players.size == 1) {
@@ -618,7 +637,7 @@ class Room(
             }
         } else {
             // Removing Player Immediately
-            println("Removing player ${playerToRemove.playerName}")
+            println("removePlayer - Removing player ${playerToRemove.playerName} IMMEDIATELY")
 
             // Remove the player from this room
             players = players - playerToRemove
@@ -639,13 +658,15 @@ class Room(
         }
     }
 
-    fun cancelRemovePlayerJob(clientId: ClientId) {
-        playerRemoveJobs[clientId]?.cancel()
-        playerRemoveJobs -= clientId
+    fun cancelRemovePlayerPermanentlyJob(clientId: ClientId) {
+        playerRemovePermanentlyJobs[clientId]?.cancel()
+        playerRemovePermanentlyJobs -= clientId
+
+        println("cancelRemovePlayerPermanentlyJob: cancelled job for player: ${getPlayerByClientId(clientId)?.playerName}")
     }
 
     private fun killRoom() {
-        playerRemoveJobs.values.forEach { it.cancel() }
+        playerRemovePermanentlyJobs.values.forEach { it.cancel() }
         timerJob?.cancel()
         serverDB.removeRoomFromServerDB(roomName)
     }
