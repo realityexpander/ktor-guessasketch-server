@@ -133,7 +133,7 @@ data class Player(
         }
     }
 
-    fun getPingPongTime(): OnlinePingPongTime {
+    fun getOnlinePingPongTime(): OnlinePingPongTime {
         return atomicMapOfClientToPingTime.get().getValue(clientId)
     }
 
