@@ -8,6 +8,7 @@ import com.realityexpander.serverDB
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 
 data class Player(
     val playerName: String,
@@ -70,7 +71,7 @@ data class Player(
         )
 
         // Check for timeout
-        if (pongTimeMillis - pingTimeMillis > PING_TIMEOUT_LIMIT_MILLIS) {
+        if (abs(pongTimeMillis - pingTimeMillis) > PING_TIMEOUT_LIMIT_MILLIS) {
             if (isOnline()) {
                 println("Player '$playerName' is OFFLINE - no ping received in over ${PING_TIMEOUT_LIMIT_MILLIS}ms\n")
 

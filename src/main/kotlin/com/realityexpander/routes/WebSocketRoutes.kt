@@ -93,6 +93,7 @@ fun Route.gameWebSocketRoute() {
                 }
                 is DisconnectRequest -> {
                     val room = serverDB.roomsDB[clientId] ?: return@standardWebSocket
+                    println("Disconnect request received: playerName='${room.getPlayerByClientId(clientId)?.playerName}'")
 
                     serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = true)
                 }
