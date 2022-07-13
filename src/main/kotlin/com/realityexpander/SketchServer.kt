@@ -27,20 +27,20 @@ class SketchServer {  // DrawingServer todo remove at end
     }
 
     // Player exiting (either on purpose or a ping timeout) // playerLeft // todo remove at end
-    fun scheduleRemovePlayerFromRoom(removeClientId: ClientId, isImmediateDisconnect: Boolean = false) {
+    fun scheduleRemovePlayerFromRoom(removeClientId: ClientId, isImmediateRemoval: Boolean = false) {
         // Find the room for the player
         val roomOfPlayer = getRoomForPlayerClientId(removeClientId)
 
         //if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline?.get() == false) {  // todo remove soon
-        if(isImmediateDisconnect || playersDB[removeClientId]?.isOnline() == false) {
+        if(isImmediateRemoval || playersDB[removeClientId]?.isOnline() == false) {
             println("Now Closing connection to ${playersDB[removeClientId]}")
 
             playersDB[removeClientId]?.stopPinging()
-            roomOfPlayer?.removePlayer(removeClientId, isImmediateDisconnect)
+            roomOfPlayer?.removePlayer(removeClientId, isImmediateRemoval)
             removePlayerFromServerDB(removeClientId)
         }
 
-        roomOfPlayer?.removePlayer(removeClientId, isImmediateDisconnect)
+        roomOfPlayer?.removePlayer(removeClientId, isImmediateRemoval)
     }
 
     fun addRoomToServer(roomName: RoomName, maxPlayers: Int) {

@@ -94,7 +94,7 @@ fun Route.gameWebSocketRoute() {
                 is DisconnectRequest -> {
                     val room = serverDB.roomsDB[clientId] ?: return@standardWebSocket
 
-                    serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateDisconnect = true)
+                    serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = true)
                 }
                 else -> {
                     println("Unknown socketType for $payload")

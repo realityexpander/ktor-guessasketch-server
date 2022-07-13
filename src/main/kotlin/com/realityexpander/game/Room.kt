@@ -585,7 +585,7 @@ class Room(
         val index = players.indexOf(playerToRemove)
 
         if (!isImmediateRemoval) {
-            // Delayed removal of player (allows for reconnects with 60s)
+            // Delayed removal of player (allows for reconnects within 60s)
 
             // Add player to exiting list
             exitingPlayers[removeClientId] = ExitingPlayer(playerToRemove, index)
