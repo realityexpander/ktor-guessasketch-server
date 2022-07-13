@@ -589,7 +589,7 @@ class Room(
         val index = players.indexOf(removePlayer)
 
         println("scheduleRemovePlayer - Player '${removePlayer.playerName}' in room '$roomName' " +
-                "scheduled for removal ${if(isImmediateRemoval) "immediately" else "after a delay"}")
+                "scheduled for ${if(isImmediateRemoval) "immediate removal" else "removal after a delay"}")
 
         // Remove the player from the room & stop pinging
         players = players - removePlayer
