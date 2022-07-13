@@ -78,7 +78,6 @@ data class Player(
                 setIsOnline(false)
 
                 serverDB.scheduleRemovePlayerFromRoom(clientId)
-                stopPinging()  // not needed? do we want to keep pinging until the player is back online or removed permanently
             }
         }
     }
@@ -98,19 +97,20 @@ data class Player(
         //                " ┡--- clientId=${this@Player.clientId})"
         //    )
 
-        // If player responds to the last ping, they are still online.
-        // This happens if the socket connection was not broken and there was too much network traffic and pong
-        //   was received more than PING_TIMEOUT_LIMIT_MILLIS milliseconds ago, ie: very late.
-        // This is unlikely to happen, but it is possible.
-        if(!isOnline()) {
-            println("Player '$playerName' is back online")
-
-            // Add the player back to the room
-            val room = serverDB.getRoomForPlayerClientId(clientId)
-            GlobalScope.launch {
-                room?.addPlayer(clientId, playerName, socket)
-            }
-        }
+        // is this necessary?
+//        // If player responds late to the last ping, they are still online.
+//        // This happens if the socket connection was not broken and there was too much network traffic and pong
+//        //   was received more than PING_TIMEOUT_LIMIT_MILLIS milliseconds ago, ie: very late.
+//        // This is unlikely to happen, but it is possible.
+//        if(!isOnline()) {
+//            println("Player '$playerName' is back online")
+//
+//            // Add the player back to the room
+//            val room = serverDB.getRoomForPlayerClientId(clientId)
+//            GlobalScope.launch {
+//                room?.addPlayer(clientId, playerName, socket)
+//            }
+//        }
 
         setIsOnline(true)
     }
