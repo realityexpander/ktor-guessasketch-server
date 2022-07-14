@@ -40,8 +40,8 @@ fun Application.module() {
     intercept(ApplicationCallPipeline.Features) {
         call.sessions.get<DrawingSession>() ?: run {
 
-            // Get the clientId from the client
-            val clientId = call.parameters[QUERY_PARAMETER_CLIENT_ID] ?: "" // throw IllegalArgumentException("clientId is required")
+            // Get the clientId from the client query parameter
+            val clientId = call.parameters[QUERY_PARAMETER_CLIENT_ID] ?:  throw IllegalArgumentException("clientId is required")
 
             call.sessions.set(DrawingSession(clientId, generateNonce()))
         }
