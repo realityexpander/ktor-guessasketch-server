@@ -91,11 +91,15 @@ fun Route.gameWebSocketRoute() {
                     //println("Ping received: playerName=${payload.playerName}")
                     serverDB.playersDB[clientId]?.receivedPong()
                 }
-                is DisconnectRequest -> {
-                    val room = serverDB.roomsDB[clientId] ?: return@standardWebSocket
-                    println("Disconnect request received: playerName='${room.getPlayerByClientId(clientId)?.playerName}'")
+                is DisconnectPermanentlyRequest -> {
+                    //println("Disconnect permanently request received: playerName='${serverDB.playersDB[clientId]?.playerName}'")
 
                     serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = true)
+                }
+                is DisconnectTemporarilyRequest -> {
+                    //println("Disconnect temporarily request received: playerName='${serverDB.playersDB[clientId]?.playerName}'")
+
+                    serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = false)
                 }
                 else -> {
                     println("Unknown socketType for $payload")

@@ -31,9 +31,9 @@ class SketchServer {  // DrawingServer todo remove at end
         // Find the room for the player
         val roomOfPlayer = getRoomForPlayerClientId(removeClientId)
 
-        // If player is offline, remove them immediately.
+        // If player is offline, remove them temporarily.
         if(playersDB[removeClientId]?.isOnline() == false) {
-            roomOfPlayer?.scheduleRemovePlayer(removeClientId, isImmediateRemoval = true)
+            roomOfPlayer?.scheduleRemovePlayer(removeClientId, isImmediateRemoval = false)
             return
         }
 

@@ -1,5 +1,6 @@
 package com.realityexpander.game
 
+import com.google.gson.JsonParser
 import com.realityexpander.common.*
 import com.realityexpander.common.Constants.PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS
 import com.realityexpander.common.Constants.SCORE_FOR_DRAWING_PLAYER_WHEN_OTHER_PLAYER_CORRECT
@@ -7,7 +8,6 @@ import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_DEFAULT
 import com.realityexpander.common.Constants.SCORE_GUESS_CORRECT_MULTIPLIER
 import com.realityexpander.common.Constants.SCORE_PENALTY_NO_PLAYERS_GUESSED_WORD
 import com.realityexpander.data.models.socket.*
-import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_GENERAL_MESSAGE
 import com.realityexpander.data.models.socket.Announcement.Companion.ANNOUNCEMENT_PLAYER_EXITED_ROOM
 import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_DOWN
 import com.realityexpander.data.models.socket.DrawData.Companion.DRAW_DATA_MOTION_EVENT_ACTION_UP
@@ -165,18 +165,29 @@ class Room(
 
             startGamePhaseCountdownTimerAndNotifyPlayers()
 
+            // Announce to players to get-to-guessin'!
+            broadcastToAllExceptOneClientId((gson.toJson(Announcement(
+                    message = "Round started - Try to guess the word!",
+                    System.currentTimeMillis(),
+                    announcementType = Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
+                ))),
+                drawingPlayer?.clientId!!)
+
+            // Announce to Drawing Player to commence-a-scribblin'
+            sendToOnePlayer(
+                gson.toJson(Announcement(
+                    message = "Round started - You are the drawing player. Try to sketch a picture for the word!",
+                    System.currentTimeMillis(),
+                    announcementType = Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
+                )),
+                drawingPlayer
+            )
+
             println("Starting ROUND_IN_PROGRESS phase for room `$roomName`,\n" +
                     " ┡--> drawingPlayer: '${drawingPlayer?.playerName!!}'\n" +
                     " ┡--> wordToGuess to drawingPlayer: '$wordToGuessToSendDrawingPlayer'\n" +
                     " ┡--> wordToGuess to guessing players: '$wordToGuessToSendAsUnderscores'\n" +
-                    " ┕--> Countdown Timer set to ${gamePhase.phaseDurationMillis / 1000} seconds\n")
-
-            // Announce to players to guess now!
-            broadcast(gson.toJson(Announcement(
-                message = "Round started - Try to guess the word!",
-                System.currentTimeMillis(),
-                announcementType = Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
-            )))
+                    " ┕--> Countdown Timer set to ${gamePhase.phaseDurationMillis / 1000} seconds")
         }
 
     }
@@ -232,9 +243,9 @@ class Room(
 
         // Reset all the players `isDrawing` status, just to be safe, :)
         for (player in players) {
-            player.isDrawing = false
+            player.isDrawingPlayer = false
         }
-        drawingPlayer?.isDrawing = false // reset the current drawing player status
+        drawingPlayer?.isDrawingPlayer = false // reset the current drawing player status
 
         // Pick the new drawing player
         drawingPlayer = if(drawingPlayerIndex <= players.size - 1) {
@@ -242,7 +253,7 @@ class Room(
         } else {
             players.last()
         }
-        drawingPlayer?.isDrawing = true
+        drawingPlayer?.isDrawingPlayer = true
 
         // Setup for the next new drawing player
         if(drawingPlayerIndex <= players.size - 1) {
@@ -322,21 +333,15 @@ class Room(
 
     // When a player joins a room (connect or reconnects)
     // Inform the player of the word to guess and the current phase
-    private suspend fun sendWordToGuessToPlayer(player: Player) {
-
-        val delay = gamePhase.phaseDurationMillis
-
-        // Send the current phase and the drawing player
-        val gamePhaseUpdate = GamePhaseUpdate(gamePhase, delay, drawingPlayer?.playerName)
-        sendToOnePlayer(gson.toJson(gamePhaseUpdate), player)
+    private suspend fun sendWordToGuessToOnePlayer(player: Player) {
 
         // If there is a word to guess, send it in the GameState
-        wordToGuess?.let {curWordToGuess ->
+        wordToGuess?.let { curWordToGuess ->
             drawingPlayer?.let { drawingPlayer ->
                 val gameState = GameState(
                     drawingPlayer.playerName,
                     drawingPlayer.clientId,
-                    if(player.isDrawing || gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED) {
+                    if(player.isDrawingPlayer || gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED) {
                         curWordToGuess
                     } else {
                         curWordToGuess.transformToUnderscores()
@@ -353,7 +358,7 @@ class Room(
     private suspend fun broadcastAllPlayersData() {  // broadcastPlayerStates // todo remove at end
         // Collect the data for all players
         val playersList = players.sortedByDescending { it.score }.map { player ->
-            PlayerData(player.playerName, player.isDrawing, player.score, player.rank)
+            PlayerData(player.playerName, player.isDrawingPlayer, player.score, player.rank)
         }
 
         // set the ranking for each player
@@ -437,8 +442,9 @@ class Room(
         }
     }
 
-
+    //////////////////////
     ////// DRAWING ///////
+    //////////////////////
 
     // Finish off the drawing
     private suspend fun finishOffDrawing() {
@@ -457,7 +463,7 @@ class Room(
     }
 
     // Send the serialized drawing data to one players
-    private suspend fun sendCurRoundDrawDataToPlayer(player: Player) {
+    private suspend fun sendCurRoundDrawDataToOnePlayer(player: Player) {
         if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
             gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
         ) {
@@ -466,11 +472,11 @@ class Room(
     }
 
 
-
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+    ///////////////////////////////////////
     ////// ROOM DATABASE OPERATIONS ///////
+    ///////////////////////////////////////
 
     suspend fun addPlayer(
         clientId: ClientId,
@@ -491,7 +497,7 @@ class Room(
                 rejoinedPlayer.socket = socketSession
 
                 // Set if the player is the drawingPlayer
-                rejoinedPlayer.isDrawing = drawingPlayer?.clientId == clientId  // is this the same as the drawing player?
+                rejoinedPlayer.isDrawingPlayer = drawingPlayer?.clientId == clientId  // is this the same as the drawing player?
 
                 // Set the position to add them back to (if possible)
                 indexToAddPlayerAt = indexOfPlayer
@@ -500,9 +506,6 @@ class Room(
                 removePlayerPermanentlyJobs[clientId]?.cancel()
                 removePlayerPermanentlyJobs.remove(clientId)
                 exitingPlayers.remove(clientId)
-
-                // Send the drawing data to the re-joining player
-                sendCurRoundDrawDataToPlayer(rejoinedPlayer)
 
                 // Modify join message
                 joinMessage = "re-joined"
@@ -540,42 +543,62 @@ class Room(
             // we use `x = x + y` instead of `x+=y`, because we want to
             //   use a copy of the immutable list to work in concurrent environments.
             players = tmpPlayers.toList() // convert back to an immutable list
+
+            println("Player '$playerName' is added to room '$roomName'\n" +
+                " ┡--- at index $indexToAddPlayerAt \n" +
+                " ┡--- total players: ${players.size} \n" +
+                " ┡--- drawing player: ${drawingPlayer?.playerName ?: "none"} \n" +
+                " ┡--- drawing player clientId: ${drawingPlayer?.clientId ?: "none"} \n" +
+                " ┡--- players: ${players.map { it.playerName }}"
+            )
+
         }
 
+        // Announce new player has joined the room
+        broadcastAnnouncement(
+            "Player '$playerName' has $joinMessage the room",
+            Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
+        )
 
         // Only player in the room?  -> keep waiting for more players
         if (players.size == ONE_PLAYER) {
+            resetGameState()
             gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS
         }
 
         // Two players in the room?  -> ready to start the game
         if (players.size == TWO_PLAYERS && gamePhase == GamePhaseUpdate.GamePhase.WAITING_FOR_PLAYERS) {
+            resetGameState()
             gamePhase = GamePhaseUpdate.GamePhase.WAITING_FOR_START
             players = players.shuffled()
         }
 
         // Max number of players in the room?  -> start the game
         if (players.size == maxPlayers && gamePhase == GamePhaseUpdate.GamePhase.WAITING_FOR_START) {
+            resetGameState()
             gamePhase = GamePhaseUpdate.GamePhase.NEW_ROUND
             players = players.shuffled()
         }
 
-        sendWordToGuessToPlayer(newPlayer)
-
-        // Send announcement to all players
-        val announcement = Announcement( "Player '$playerName' has $joinMessage the room",
-            System.currentTimeMillis(),
-            Announcement.ANNOUNCEMENT_PLAYER_JOINED_ROOM
-        )
-        broadcast(gson.toJson(announcement))
 
         // Send the all current players' data to all players
         broadcastAllPlayersData()
 
         // Send the drawing data to the new player
-        sendCurRoundDrawDataToPlayer(newPlayer)
+        sendCurRoundDrawDataToOnePlayer(newPlayer)
+
+        sendWordToGuessToOnePlayer(newPlayer)
+
+        broadcastGameState()
+
+        broadcastGamePhaseUpdate()
 
         return newPlayer
+    }
+
+    private fun resetGameState() {
+        wordToGuess = null
+        drawingPlayer = null
     }
 
     // Flow is:
@@ -601,6 +624,16 @@ class Room(
             // Delayed removal of player (allows for reconnects within 60s)
             println("scheduleRemovePlayer - permanent removal scheduled in ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
                     "for player: '${removePlayer.playerName}'")
+
+            GlobalScope.launch {
+                // Tell all players that a player has been removed
+                broadcastAnnouncement(
+                    message = "Player '${removePlayer.playerName}' has temporarily left the room.",
+                    announcementType = ANNOUNCEMENT_PLAYER_EXITED_ROOM
+                )
+
+                broadcastAllPlayersData()
+            }
 
             // Add player to exiting list
             exitingPlayers[removeClientId] = ExitingPlayer(removePlayer, index)
@@ -628,17 +661,6 @@ class Room(
             }
         }
 
-        GlobalScope.launch {
-            // Tell all players that a player has been removed
-            val announcement = Announcement(
-                message = "Player '${removePlayer.playerName}' has left the room.",
-                timestamp = System.currentTimeMillis(),
-                announcementType = ANNOUNCEMENT_PLAYER_EXITED_ROOM
-            )
-
-            broadcast(gson.toJson(announcement))
-            broadcastAllPlayersData()
-        }
     }
 
     private fun removePlayerPermanently(removePlayer: Player) {
@@ -646,6 +668,16 @@ class Room(
 
         // Remove the player from the server
         serverDB.removePlayerFromServerDB(removePlayer.clientId)
+
+        GlobalScope.launch {
+            // Tell all players that a player has been removed
+            broadcastAnnouncement(
+                message = "Player '${removePlayer.playerName}' has permanently left the room.",
+                announcementType = ANNOUNCEMENT_PLAYER_EXITED_ROOM
+            )
+
+            broadcastAllPlayersData()
+        }
 
         // Check if there is only one player
         if(players.size == 1) {
@@ -655,14 +687,9 @@ class Room(
             timerJob?.cancel()
 
             GlobalScope.launch {
-                broadcast(
-                    gson.toJson(
-                        Announcement(
-                            message = "No other players in the room, now waiting for players to join...",
-                            timestamp = System.currentTimeMillis(),
-                            announcementType = ANNOUNCEMENT_GENERAL_MESSAGE
-                        )
-                    )
+                broadcastAnnouncement(
+                    message = "No other players in the room, now waiting for players to join...",
+                    Announcement. ANNOUNCEMENT_GENERAL_MESSAGE
                 )
             }
 
@@ -673,14 +700,9 @@ class Room(
             println("removePlayerPermanently - No players left in the room, killing the room")
 
             GlobalScope.launch {
-                broadcast(
-                    gson.toJson(
-                        Announcement(
-                            message = "No players left, The room has been killed.",
-                            timestamp = System.currentTimeMillis(),
-                            announcementType = ANNOUNCEMENT_GENERAL_MESSAGE
-                        )
-                    )
+                broadcastAnnouncement(
+                    "No players left, The room has been killed.",
+                    Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
                 )
             }
 
@@ -702,10 +724,23 @@ class Room(
         serverDB.removeRoomFromServerDB(roomName)
     }
 
+
+    ////////////////////////////
     //////// MESSAGING /////////
+    ////////////////////////////
 
     suspend fun broadcast(messageJson: String) {
-        println("Broadcast messageJson: $messageJson")
+
+        // Suppress the countdown timer messages
+        val messageJsonObj = JsonParser.parseString(messageJson).asJsonObject
+        val isCountdownTimerHidden =
+            messageJsonObj.get("type").asString == "TYPE_GAME_PHASE_UPDATE" &&
+            messageJsonObj.get("gamePhase") == null &&
+            messageJsonObj.get("countdownTimerMillis").asLong >= 4000
+
+        if(!isCountdownTimerHidden) {
+            println("Broadcast messageJson: $messageJson")
+        }
 
         players.forEach { player ->
           if(player.socket.isActive) {
@@ -723,7 +758,7 @@ class Room(
         players.forEach { player ->
             if(player.clientId != clientIdToExclude && player.socket.isActive) {
                 println("   ┡--> sending to '${player.playerName}':\n" +
-                        "   ┕----> $messageJson\n")
+                        "   ┕--> $messageJson")
                 player.socket.send(Frame.Text(messageJson))
             }
         }
@@ -745,7 +780,39 @@ class Room(
         }
     }
 
+    private suspend fun broadcastGameState() {
+        val gameState = GameState(
+            drawingPlayer?.playerName ?: "",
+            drawingPlayer?.clientId ?: "",
+            wordToGuess ?: ""
+        )
+        broadcast(gson.toJson(gameState))
+    }
+
+    private suspend fun broadcastAnnouncement(message: String, announcementType: String) {
+        val announcement = Announcement(
+            message,
+            System.currentTimeMillis(),
+            announcementType
+        )
+        broadcast(gson.toJson(announcement))
+    }
+
+    private suspend fun broadcastGamePhaseUpdate() {
+        // Send the current phase and the drawing player
+        val gamePhaseUpdate = GamePhaseUpdate(
+            gamePhase,
+            gamePhase.phaseDurationMillis,
+            drawingPlayer?.playerName
+        )
+        //sendToOnePlayer(gson.toJson(gamePhaseUpdate), player)
+        broadcast(gson.toJson(gamePhaseUpdate))
+    }
+
+
+    ////////////////////////////
     //////// UTILITIES /////////
+    ////////////////////////////
 
     fun containsPlayerName(playerName: String): Boolean {
         return players.find { it.playerName == playerName } != null

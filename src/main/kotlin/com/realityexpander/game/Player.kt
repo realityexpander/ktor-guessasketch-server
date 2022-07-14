@@ -14,7 +14,7 @@ data class Player(
     val playerName: String,
     var socket: WebSocketSession,
     val clientId: ClientId,
-    var isDrawing: Boolean = false,
+    var isDrawingPlayer: Boolean = false,
     var score: Int = 0,
     var rank: Int = 0,
 ) {
@@ -39,7 +39,7 @@ data class Player(
             while (true) {
                 sendPing()
 
-                delay(PING_TIMEOUT_LIMIT_MILLIS)  // a little breathing room between pings
+                // delay(PING_TIMEOUT_LIMIT_MILLIS)  // a little breathing room between pings
             }
         }
     }
@@ -50,17 +50,17 @@ data class Player(
         setPingTimeMillis(pingTimeMillis)
 
         socket.send(Frame.Text(gson.toJson(Ping())))
-        println("Player '$playerName' SENT ping\n" +
-                " ┡--- pingTime=${pingTimeMillis}")
+//        println("Player '$playerName' SENT ping\n" +
+//                " ┡--- pingTime=${pingTimeMillis}")
 
         delay(PING_TIMEOUT_LIMIT_MILLIS)  // wait for response
 
         // Get the pong "turnaround" time for this client
         val pongTimeMillis = getPongTimeMillis()
 
-        println(
-            "Player '$playerName' TURNAROUND for ping->pong\n" +
-                    " ┡--- pong-ping turnaround : ${pongTimeMillis - pingTimeMillis}ms\n"
+//        println(
+//            "Player '$playerName' TURNAROUND for ping->pong\n" +
+//                    " ┡--- pong-ping turnaround : ${pongTimeMillis - pingTimeMillis}ms\n"
 //                  +
 //                    " ┡--- last ping sent at    : ${pingTimeMillis},\n" +
 //                    " ┡--- last pong received at: ${pongTimeMillis}\n" +
@@ -68,12 +68,12 @@ data class Player(
 //                    " ┡--- last pong received   : ${System.currentTimeMillis() - pongTimeMillis}ms ago\n" +
 //                    " ┡--- Online?              : ${isOnline()}\n" +
 //                    " ┡--- clientId=${this@Player.clientId}"
-        )
+//        )
 
         // Check for timeout
         if (abs(pongTimeMillis - pingTimeMillis) > PING_TIMEOUT_LIMIT_MILLIS) {
             if (isOnline()) {
-                println("Player '$playerName' is OFFLINE - no ping received in over ${PING_TIMEOUT_LIMIT_MILLIS}ms\n")
+                println("Player '$playerName' is OFFLINE - no pong received in over ${PING_TIMEOUT_LIMIT_MILLIS}ms\n")
 
                 setIsOnline(false)
 
@@ -97,7 +97,7 @@ data class Player(
         //                " ┡--- clientId=${this@Player.clientId})"
         //    )
 
-        // is this necessary?
+        // is this necessary? todo
 //        // If player responds late to the last ping, they are still online.
 //        // This happens if the socket connection was not broken and there was too much network traffic and pong
 //        //   was received more than PING_TIMEOUT_LIMIT_MILLIS milliseconds ago, ie: very late.
