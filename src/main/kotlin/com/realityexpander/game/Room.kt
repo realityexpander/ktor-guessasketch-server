@@ -137,27 +137,28 @@ class Room(
 
         // Drawing player is sent the actual word to guess
         val gameStateForDrawingPlayer = GameState(
-            drawingPlayer?.playerName!!,
-            drawingPlayer?.clientId!!,
+            drawingPlayer?.playerName,
+            drawingPlayer?.clientId,
             wordToGuessToSendDrawingPlayer
         )
 
         // Other players are sent the word to guess AS UNDERSCORES
         val gameStateForGuessingPlayers = GameState(
-            drawingPlayer?.playerName!!,
-            drawingPlayer?.clientId!!,
+            drawingPlayer?.playerName,
+            drawingPlayer?.clientId,
             wordToGuessToSendAsUnderscores
         )
 
         // Send the new GameState to all players
         GlobalScope.launch {
+
             // send the word to guess (as underscores) to everyone except the drawing player
             broadcastToAllExceptOneClientId(
                 gson.toJson(gameStateForGuessingPlayers),
                 drawingPlayer?.clientId!!
             )
 
-            // Send the actual word to guess to the drawing player
+            // Send the full word to guess to the drawing player
             sendToOnePlayer(
                 gson.toJson(gameStateForDrawingPlayer),
                 drawingPlayer
@@ -166,12 +167,14 @@ class Room(
             startGamePhaseCountdownTimerAndNotifyPlayers()
 
             // Announce to players to get-to-guessin'!
-            broadcastToAllExceptOneClientId((gson.toJson(Announcement(
+            broadcastToAllExceptOneClientId(
+                gson.toJson(Announcement(
                     message = "Round started - Try to guess the word!",
                     System.currentTimeMillis(),
                     announcementType = Announcement.ANNOUNCEMENT_GENERAL_MESSAGE
-                ))),
-                drawingPlayer?.clientId!!)
+                )),
+                drawingPlayer?.clientId!!
+            )
 
             // Announce to Drawing Player to commence-a-scribblin'
             sendToOnePlayer(
@@ -782,9 +785,9 @@ class Room(
 
     private suspend fun broadcastGameState() {
         val gameState = GameState(
-            drawingPlayer?.playerName ?: "",
-            drawingPlayer?.clientId ?: "",
-            wordToGuess ?: ""
+            drawingPlayer?.playerName,
+            drawingPlayer?.clientId,
+            wordToGuess
         )
         broadcast(gson.toJson(gameState))
     }

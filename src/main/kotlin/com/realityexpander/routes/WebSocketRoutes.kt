@@ -93,12 +93,10 @@ fun Route.gameWebSocketRoute() {
                 }
                 is DisconnectPermanentlyRequest -> {
                     //println("Disconnect permanently request received: playerName='${serverDB.playersDB[clientId]?.playerName}'")
-
                     serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = true)
                 }
                 is DisconnectTemporarilyRequest -> {
                     //println("Disconnect temporarily request received: playerName='${serverDB.playersDB[clientId]?.playerName}'")
-
                     serverDB.scheduleRemovePlayerFromRoom(clientId, isImmediateRemoval = false)
                 }
                 else -> {
