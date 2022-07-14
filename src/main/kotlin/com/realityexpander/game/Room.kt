@@ -37,7 +37,7 @@ class Room(
 
     // Track players removing/reconnecting
     private var removePlayerPermanentlyJobs = ConcurrentHashMap<ClientId, Job>()
-    private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()  // leftPlayers todo remove
+    private val exitingPlayers = ConcurrentHashMap<String, ExitingPlayer>()
 
     // Track drawing data
     private var curRoundDrawData: List<String> = listOf()  // list of json strings of DrawData and DrawAction objects
@@ -104,7 +104,7 @@ class Room(
     }
 
     // Starting the round, choose a drawing player and let them pick a word from the list of 3 words
-    private fun newRoundPhase() {  // newRound // todo remove at end
+    private fun newRoundPhase() {
         curRoundDrawData = listOf() // reset the drawing data
         curWords = getRandomWords(3)
         val wordsToPickHolder = WordsToPick(curWords!!)
@@ -125,7 +125,7 @@ class Room(
         }
     }
 
-    private fun roundInProgressPhase() { // game_running gameRunning  // todo remove at end
+    private fun roundInProgressPhase() {
         drawingPlayer ?: throw IllegalStateException("drawingPlayer is null")
 
         winningPlayers = listOf() // reset the list of winning players
@@ -196,8 +196,6 @@ class Room(
     }
 
     private fun roundEndedPhase(){
-        // showWord, show_word // todo remove at end
-
         GlobalScope.launch {
 
             // Broadcast the unmasked wordToGuess to all players
@@ -358,7 +356,7 @@ class Room(
     }
 
     // Send data of players (score, rank, name, etc) to all the players
-    private suspend fun broadcastAllPlayersData() {  // broadcastPlayerStates // todo remove at end
+    private suspend fun broadcastAllPlayersData() {
         // Collect the data for all players
         val playersList = players.sortedByDescending { it.score }.map { player ->
             PlayerData(player.playerName, player.isDrawingPlayer, player.score, player.rank)
@@ -380,7 +378,6 @@ class Room(
     // 3. Wait for the phase to end
     // 4. Notify the players that the phase has ended
     // 5. Proceed to the next phase of the game
-    // timeAndNotify  todo remove at end
     private fun startGamePhaseCountdownTimerAndNotifyPlayers() {
 
         // If its indeterminate duration, no need for the timer.
@@ -394,10 +391,10 @@ class Room(
             // Set and Start the game phase countdown timer
             gamePhaseStartTimeMillis = System.currentTimeMillis()
             val gamePhaseUpdate = GamePhaseUpdate(
-                gamePhase,  // change to new phase of the game
-                //gamePhaseDurationMillis,
+                gamePhase,  // change to new phase of the game when this is non-null
                 gamePhase.phaseDurationMillis,
-                drawingPlayer?.playerName
+                drawingPlayer?.playerName,
+                drawingPlayer?.clientId
             )
 
             // Notify the players that the phase has started
@@ -465,7 +462,7 @@ class Room(
         curRoundDrawData = curRoundDrawData + drawDataJson
     }
 
-    // Send the serialized drawing data to one players
+    // Send the serialized drawing data to one player
     private suspend fun sendCurRoundDrawDataToOnePlayer(player: Player) {
         if(gamePhase == GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS ||
             gamePhase == GamePhaseUpdate.GamePhase.ROUND_ENDED
@@ -806,9 +803,9 @@ class Room(
         val gamePhaseUpdate = GamePhaseUpdate(
             gamePhase,
             gamePhase.phaseDurationMillis,
-            drawingPlayer?.playerName
+            drawingPlayer?.playerName,
+            drawingPlayer?.clientId
         )
-        //sendToOnePlayer(gson.toJson(gamePhaseUpdate), player)
         broadcast(gson.toJson(gamePhaseUpdate))
     }
 

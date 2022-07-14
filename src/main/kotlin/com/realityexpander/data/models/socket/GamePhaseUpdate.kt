@@ -5,7 +5,8 @@ import com.realityexpander.data.models.socket.SocketMessageType.TYPE_GAME_PHASE_
 data class GamePhaseUpdate(
     var gamePhase: GamePhase? = null,  // if NOT null, causes a phase change. If null, it's not serialized.
     var countdownTimerMillis: Long = 0L,
-    val drawingPlayerName: String? = null,  // todo add drawingPlayerClientId
+    val drawingPlayerName: String? = null,
+    val drawingPlayerClientId: String? = null
 ): BaseMessageType(TYPE_GAME_PHASE_UPDATE) {
 
     enum class GamePhase(val phaseDurationMillis: Long = INDETERMINATE_DURATION_MILLIS) {
