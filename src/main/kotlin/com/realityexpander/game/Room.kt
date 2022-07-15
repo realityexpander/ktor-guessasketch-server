@@ -612,7 +612,8 @@ class Room(
         val index = players.indexOf(removePlayer)
 
         println("scheduleRemovePlayer - Player '${removePlayer.playerName}' in room '$roomName' " +
-                "scheduled for ${if(isImmediateRemoval) "immediate removal" else "removal after a delay"}")
+                "scheduled for ${if(isImmediateRemoval) "immediate removal" else "removal after a" +
+                        " ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} second delay"}")
 
         // Remove the player from the room & stop pinging
         players = players - removePlayer
@@ -622,8 +623,6 @@ class Room(
             permanentlyRemovePlayer(removePlayer)
         } else {
             // Delayed removal of player (allows for reconnects within 60s)
-            println("scheduleRemovePlayer - permanent removal scheduled in ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
-                    "for player: '${removePlayer.playerName}'")
 
             GlobalScope.launch {
                 // Tell all players that a player has been removed
