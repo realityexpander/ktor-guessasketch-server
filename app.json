@@ -1,0 +1,5 @@
+{
+  "name": "Guess-a-Sketch",
+  "description": "Guess-a-Sketch is a game where one player attempts to draw a random word and other players guess it, for points.",
+  "image": "heroku/java"
+}

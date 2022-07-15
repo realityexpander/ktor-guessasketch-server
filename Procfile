@@ -1,0 +1,1 @@
+web:    java -jar build/libs/ktor-guessasketch-server-0.0.1-all.jar

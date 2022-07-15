@@ -5,6 +5,34 @@ package com.realityexpander
 // Ktor generator
 // https://start.ktor.io/#/final?name=ktor-drawing-server&website=realityexpander.com&artifact=com.realityexpander.ktor-drawing-server&kotlinVersion=1.7.0&ktorVersion=1.5.3&buildSystem=GRADLE&engine=NETTY&configurationIn=HOCON&addSampleCode=true&plugins=content-negotiation%2Crouting%2Cktor-gson%2Cktor-websockets%2Cshutdown-url%2Ccall-logging
 
+// Deploy to heroku steps
+//
+// make a heroku account:
+//   https://dashboard.heroku.com/signup
+//
+// Add the following to your project:
+//   app.json   # this is the file that heroku uses to deploy your app
+//   .env       # environment variables
+//   Procfile   # tells heroku how to run your app (just a shell command) NOTE: be sure to update the version of your app!
+//
+// Login to heroku from the command line:
+//   heroku login
+//
+// create a new app via heroku cli:
+//   heroku create
+//
+// Rename the app:
+//   heroku rename <new-app-name>
+//
+// Add the following to your .env file:
+//   PORT=8005
+//   DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<database>
+//   SECRET=<secret>
+
+// To deploy current version to heroku:
+//   git push heroku master
+
+
 import com.google.gson.Gson
 import com.realityexpander.common.Constants.QUERY_PARAMETER_CLIENT_ID
 import io.ktor.application.*

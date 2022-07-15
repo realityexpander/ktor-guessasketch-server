@@ -1,6 +1,19 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'org.codehaus.groovy:groovy-all:2.4.12'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10" //${kotlin.version}"
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
+    }
+}
+
 plugins {
     id 'application'
     id 'org.jetbrains.kotlin.jvm' version '1.7.0'
+    id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 group "com.realityexpander"
@@ -28,4 +41,12 @@ dependencies {
 
     // Allow Manual serialization
     implementation("com.google.code.gson:gson:2.8.6")
+}
+
+// Create the fat jar
+jar.enabled = false  // set to false to disable the jar task
+shadowJar {
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
 }
