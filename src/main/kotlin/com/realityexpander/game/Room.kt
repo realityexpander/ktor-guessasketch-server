@@ -619,7 +619,7 @@ class Room(
         removePlayer.stopPinging()
 
         if (isImmediateRemoval) {
-            removePlayerPermanently(removePlayer)
+            permanentlyRemovePlayer(removePlayer)
         } else {
             // Delayed removal of player (allows for reconnects within 60s)
             println("scheduleRemovePlayer - permanent removal scheduled in ${PLAYER_EXIT_REMOVE_PERMANENTLY_DELAY_MILLIS / 1000L} seconds " +
@@ -657,13 +657,13 @@ class Room(
                 // remove this job
                 removePlayerPermanentlyJobs -= removeClientId
 
-                removePlayerPermanently(exitingPlayer.player)
+                permanentlyRemovePlayer(exitingPlayer.player)
             }
         }
 
     }
 
-    private fun removePlayerPermanently(removePlayer: Player) {
+    private fun permanentlyRemovePlayer(removePlayer: Player) {
         println("removePlayerPermanently - IMMEDIATELY Removing player ${removePlayer.playerName}")
 
         // Remove the player from the server

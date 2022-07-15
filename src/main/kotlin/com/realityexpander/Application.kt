@@ -28,10 +28,20 @@ package com.realityexpander
 //   PORT=8005
 //   DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<database>
 //   SECRET=<secret>
+//
+// Configure gradle for heroku:
+//   heroku config:set GRADLE_TASK="build -x test"       # build without(-x) tests
+//
+// Set Environment Variables (instead of using .env file, also accessible from the heroku dashboard):
+//   heroku config:add PORT=8005  # this is the port that heroku will use to run your app
 
-// To deploy current version to heroku:
-//   git push heroku master
+// To deploy current version to heroku from master branch:
+//   git push heroku master:main
+// or if from a branch:
+//   git push heroku <branch-name>:main
 
+// Check logs from heroku:
+//   heroku logs --tail
 
 import com.google.gson.Gson
 import com.realityexpander.common.Constants.QUERY_PARAMETER_CLIENT_ID
