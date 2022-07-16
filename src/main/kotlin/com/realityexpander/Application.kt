@@ -138,10 +138,10 @@ package com.realityexpander
 //   HOST_SERVER_IP_ADDRESS=<HOST_SERVER_IP_ADDRESS>   # the IP address of the server you are connecting to
 //   HOST_SERVER_USERNAME=<HOST_SERVER_USERNAME>       # usually root
 //
-// 18. Update the `HTTP_BASE_URL_REMOTE` the data/remote/common.Constants.kt
+// 19. Update the `HTTP_BASE_URL_REMOTE` the data/remote/common.Constants.kt
 //     in Android Studio to your server's IP address, and set `USE_LOCALHOST` to false
 //
-// 22. Run the `deployToUbuntu` task in IntelliJ
+// 20. Run the `deployToUbuntu` task in IntelliJ
 
 // To Check if it is running:
 //   ps aux | grep java
