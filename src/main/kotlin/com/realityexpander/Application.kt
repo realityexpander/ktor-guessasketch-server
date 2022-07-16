@@ -50,7 +50,7 @@ package com.realityexpander
 // or to deploy a particular branch:
 //   git push heroku <branch-name>:main
 
-// Check logs from heroku:
+// Check logs from heroku (run locally):
 //   heroku logs --tail
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +105,7 @@ package com.realityexpander
 //   Restart=always
 //   RestartSec=1
 //   User=root
-//   ExecStart=sudo java -jar /root/guessasketch/ktor-guessasketch-server.jar
+//   ExecStart=/usr/bin/java -jar /root/guessasketch/ktor-guessasketch-server.jar
 //
 //   [Install]
 //   WantedBy=multi-user.target
@@ -143,13 +143,13 @@ package com.realityexpander
 //
 // 20. Run the `deployToUbuntu` task in IntelliJ
 
-// To Check if it is running:
+// To Check if app is running (run on server):
 //   ps aux | grep java
 
-// Check the running logs:
+// Check the running logs (run on server):
 //   journalctl -u guessasketch.service
 
-// Check the service logs:
+// Check the service logs (run on server):
 //   systemctl status guessasketch
 
 
