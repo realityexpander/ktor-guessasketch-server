@@ -1,7 +1,6 @@
 package com.realityexpander.routes
 
 import com.realityexpander.common.Constants.ROOM_MAX_NUM_PLAYERS
-import com.realityexpander.game.Room
 import com.realityexpander.data.models.response.BasicApiResponse
 import com.realityexpander.data.models.response.BasicApiResponseWithData
 import com.realityexpander.data.models.request.CreateRoomRequest
@@ -58,7 +57,7 @@ fun Route.createRoomRoute() {
             }
 
             // Create the room
-            serverDB.addRoomToServer(roomRequest.roomName, roomRequest.maxPlayers )
+            serverDB.addRoomToServerDB(roomRequest.roomName, roomRequest.maxPlayers )
 
             println("Created room: ${roomRequest.roomName}")
 

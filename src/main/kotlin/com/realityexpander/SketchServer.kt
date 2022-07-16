@@ -40,7 +40,7 @@ class SketchServer {
         roomOfPlayer?.scheduleRemovePlayer(removeClientId, isImmediateRemoval)
     }
 
-    fun addRoomToServer(roomName: RoomName, maxPlayers: Int) {
+    fun addRoomToServerDB(roomName: RoomName, maxPlayers: Int) {
         val room = Room(roomName, maxPlayers)
         serverDB.roomsDB[roomName] = room
     }
