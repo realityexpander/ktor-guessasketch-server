@@ -70,7 +70,7 @@ package com.realityexpander
 //
 // 4. In your IntelliJ project, create a folder called `keys` in the root folder,
 //    Add the `/keys` folder to your `.gitignore` file.
-//    Paste the private key <keyname> from the `~/.ssh` into this `keys` folder.
+//    Copy the private key <keyname> from the `~/.ssh` into this `keys` folder.
 //
 // 5. Login to your Ubuntu server via SSH private key:
 //   ssh -i <keyname> root@<host>
