@@ -6,7 +6,7 @@ buildscript {
     dependencies {
         classpath 'org.codehaus.groovy:groovy-all:2.4.12'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10" //${kotlin.version}"
-        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'  // for shadowJar plug-in
     }
 }
 
@@ -27,6 +27,10 @@ repositories {
     mavenCentral()
 }
 
+configurations {
+    sshAntTask  // for ssh-ant-task, for `ssh` and `scp` to push files to remote server
+}
+
 dependencies {
     implementation "io.ktor:ktor-server-core:$ktor_version"
     implementation "io.ktor:ktor-gson:$ktor_version"
@@ -41,7 +45,24 @@ dependencies {
 
     // Allow Manual serialization
     implementation("com.google.code.gson:gson:2.8.6")
+
+    // ssh and scp ant tasks
+    sshAntTask 'org.apache.ant:ant-jsch:1.9.2'
 }
+
+// For ssh - secure shell
+ant.taskdef (
+    name: 'scp',
+    classname: 'org.apache.tools.ant.taskdefs.optional.ssh.Scp',
+    classpath: configurations.sshAntTask.asPath
+)
+
+// For scp - secure copy
+ant.taskdef (
+        name: 'ssh',
+        classname: 'org.apache.tools.ant.taskdefs.optional.ssh.SSHExec',
+        classpath: configurations.sshAntTask.asPath
+)
 
 // Create the fat jar
 jar.enabled = false  // set to false to disable the jar task
@@ -49,4 +70,113 @@ shadowJar {
     manifest {
         attributes 'Main-Class': mainClassName
     }
+}
+
+task deployToHeroku() {
+    dependsOn("clean","shadowJar")
+
+    doLast {
+        println "•--> Deploying branch 'master' to Heroku..."
+        runCommand('git push heroku master:main', 90000)
+
+        println "•--> run 'heroku logs --tail' to see the real-time logs"
+    }
+}
+
+task deployToUbuntu() {
+    dependsOn("clean","shadowJar")
+
+    doLast {
+        // get environment variables
+        def localEnvFile = "./.env"
+        def localEnv = new Properties()
+        localEnv.load(new FileInputStream(localEnvFile))
+        def env_privateKeyFilename = localEnv.get("PRIVATE_KEY_FILENAME")
+        def env_host = localEnv.get("HOST_SERVER_IP_ADDRESS")
+        def env_user = localEnv.get("HOST_SERVER_USERNAME")
+
+        // create known hosts file
+        def knownHosts = File.createTempFile("knownHosts", ".txt")
+        def host = env_host
+        def user = env_user
+        def privateKeyFile = file("./keys/$env_privateKeyFilename")
+
+        // Reference the jar file
+        def jarFileName = project.name + "-" + project.version + "-all.jar"
+        def localJarFilePath = project.buildDir.path + "/libs" + "/" + jarFileName
+        def remoteAppRootPath = "/root/guessasketch"
+
+        try {
+            // copy the jar to the server
+            ant.scp(
+                file: file(localJarFilePath),
+                todir: "$user@$host:$remoteAppRootPath/$jarFileName",
+                knownhosts: knownHosts,
+                keyfile: privateKeyFile,
+                trust: true,
+            )
+
+            // copy the resources to the server (images, text files, etc.)
+            ant.scp(
+                    todir: "$user@$host:$remoteAppRootPath/resources",
+                    knownhosts: knownHosts,
+                    keyfile: privateKeyFile,
+                    trust: true
+            ) {
+                fileset(dir: 'resources') {
+                    include(name: "**/*")
+                }
+            }
+
+            // Rename the jar file to the name used in the service
+            ant.ssh(
+                host: host,
+                username: user,
+                keyfile: privateKeyFile,
+                trust: true,
+                knownHosts: knownHosts,
+                command: "mv $remoteAppRootPath/$jarFileName $remoteAppRootPath/${project.name}.jar"
+            )
+
+            // Stop the service
+            ant.ssh(
+                    host: host,
+                    username: user,
+                    keyfile: privateKeyFile,
+                    trust: true,
+                    knownHosts: knownHosts,
+                    command: "systemctl stop ${project.name}"
+            )
+
+            // Start the service
+            ant.ssh(
+                    host: host,
+                    username: user,
+                    keyfile: privateKeyFile,
+                    trust: true,
+                    knownHosts: knownHosts,
+                    command: "systemctl start ${project.name}"
+            )
+
+
+        } catch (Exception e) {
+            println("Error: ${e.message}")
+        } finally {
+            knownHosts.delete()
+        }
+    }
+}
+
+String runCommand(String cmd, Long timeOutMillis, Boolean printOutput = true) {
+    def sout = new StringBuilder(), serr = new StringBuilder()
+    println("Executing: $cmd")
+
+    def proc = cmd.execute()
+    proc.consumeProcessOutput(sout, serr)
+    proc.waitForOrKill(timeOutMillis)
+
+    if (printOutput) println "out> $sout\nerr> $serr"
+    proc.destroy()
+
+    return sout.toString()
 }

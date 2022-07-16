@@ -2,8 +2,8 @@ package com.realityexpander.common
 
 import java.io.File
 
-val words = readWordList("src/main/resources/programmers_wordlist.txt")
-//val words = readWordList("resources/wordlist.txt") // alternate list
+val words = readWordList("./resources/programmers_wordlist.txt")
+//val words = readWordList("./resources/wordlist.txt") // alternate list
 
 fun readWordList(filePath: String): List<String> {
     val file = File(filePath)

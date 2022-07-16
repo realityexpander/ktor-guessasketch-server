@@ -5,15 +5,24 @@ package com.realityexpander
 // Ktor generator
 // https://start.ktor.io/#/final?name=ktor-drawing-server&website=realityexpander.com&artifact=com.realityexpander.ktor-drawing-server&kotlinVersion=1.7.0&ktorVersion=1.5.3&buildSystem=GRADLE&engine=NETTY&configurationIn=HOCON&addSampleCode=true&plugins=content-negotiation%2Crouting%2Cktor-gson%2Cktor-websockets%2Cshutdown-url%2Ccall-logging
 
-// Deploy to heroku steps
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DEPLOY TO HEROKU STEPS
+// https://devcenter.heroku.com/articles/deploying-gradle-apps-on-heroku
 //
 // make a heroku account:
 //   https://dashboard.heroku.com/signup
+//
+// Dashboard:
+//   https://dashboard.heroku.com/apps/guess-a-sketch-server
 //
 // Add the following to your project:
 //   app.json   # this is the file that heroku uses to deploy your app
 //   .env       # environment variables
 //   Procfile   # tells heroku how to run your app (just a shell command) NOTE: be sure to update the version of your app!
+//
+// Heroku CLI:
+//   https://devcenter.heroku.com/articles/heroku-cli#install-the-heroku-cli
 //
 // Login to heroku from the command line:
 //   heroku login
@@ -26,22 +35,124 @@ package com.realityexpander
 //
 // Add the following to your .env file:
 //   PORT=8005
-//   DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<database>
+//   DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<database>  #not used but kept for refernece
 //   SECRET=<secret>
 //
 // Configure gradle for heroku:
 //   heroku config:set GRADLE_TASK="build -x test"       # build without(-x) tests
 //
 // Set Environment Variables (instead of using .env file, also accessible from the heroku dashboard):
+// https://dashboard.heroku.com/apps/guess-a-sketch-server/settings
 //   heroku config:add PORT=8005  # this is the port that heroku will use to run your app
 
 // To deploy current version to heroku from master branch:
 //   git push heroku master:main
-// or if from a branch:
+// or to deploy a particular branch:
 //   git push heroku <branch-name>:main
 
 // Check logs from heroku:
 //   heroku logs --tail
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DEPLOY TO UBUNTU STEPS
+//
+// Deployment step by step:
+//
+// 1. Download Git Bash (only if on Windows)
+//
+// 2. With terminal, cd into the `~/.ssh` folder.
+//    Generate a key pair:
+//   ssh-keygen -m PEM -t rsa -b 2048
+//
+// 3. Copy the public key to your server:
+//   ssh-copy-id -i <keyname>.pub root@<host>
+//
+// 4. In your IntelliJ project, create a folder called `keys` in the root folder,
+//    Add the `/keys` folder to your `.gitignore` file.
+//    Paste the private key <keyname> from the `~/.ssh` into this `keys` folder.
+//
+// 5. Login to your Ubuntu server via SSH private key:
+//   ssh -i <keyname> root@<host>
+//
+// 6. Update dependencies:
+//   sudo apt update
+//
+// 7. Install Java:
+//   sudo apt-get install default-jdk
+//
+// 8. Open /etc/ssh/sshd_config:
+//   sudo nano /etc/ssh/sshd_config
+//
+// 9. Put this key exchange algorithm configuration string in there, save with Ctrl+S and exit with Ctrl+X:
+//   KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha1,diffie-hellman-group-exchange-sha1,diffie-hellman-group1-sha1
+//
+// 10. Restart the sshd service to apply changes in the config file `/etc/ssh/sshd_config`:
+//   sudo systemctl restart sshd
+//
+// 11. Create a systemd service for your Ktor server:
+//   sudo nano /etc/systemd/system/guessasketch.service
+//
+// 12. Paste this configuration in this service, then save with Ctrl+S and exit with Ctrl+X:
+//   [Unit]
+//   Description=Guess-a-Sketch server app Service
+//   After=network.target
+//   StartLimitIntervalSec=10
+//   StartLimitBurst=5
+//
+//   [Service]
+//   Type=simple
+//   Restart=always
+//   RestartSec=1
+//   User=root
+//   ExecStart=sudo java -jar /root/guessasketch/ktor-guessasketch-server.jar
+//
+//   [Install]
+//   WantedBy=multi-user.target
+//
+// 13. Launch the service:
+//   sudo systemctl start guessasketch
+//
+// 14. Create a symlink to automatically launch the service on boot up:
+//   sudo systemctl enable guessasketch
+//
+// 15. Make sure, your ports are open and you forward the traffic from the standard HTTP port to 8005:
+//   iptables -t nat -I PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8005  # routes 80 to 8005
+//   sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT   # opens port 80 for incoming connections
+//   sudo iptables -A INPUT -p tcp --dport 8005 -j ACCEPT # opens port 8005 for incoming connections
+//
+// 16. Then, save your iptables rules to reload at bootup:
+//   sudo apt-get install iptables-persistent
+//   <enter>
+//   <enter>
+//
+// 17. Create the folder structure
+//   cd /root
+//   mkdir guessasketch
+//   cd guessasketch
+//   mkdir resources
+//
+// 18. Update the `.env` file with the following:
+//   PORT=8005
+//   PRIVATE_KEY_FILENAME=<PRIVATE_KEY_FILENAME>       # the name of the private key file in the `keys` folder
+//   HOST_SERVER_IP_ADDRESS=<HOST_SERVER_IP_ADDRESS>   # the IP address of the server you are connecting to
+//   HOST_SERVER_USERNAME=<HOST_SERVER_USERNAME>       # usually root
+//
+// 18. Update the `HTTP_BASE_URL_REMOTE` the data/remote/common.Constants.kt
+//     in Android Studio to your server's IP address, and set `USE_LOCALHOST` to false
+//
+// 22. Run the `deployToUbuntu` task in IntelliJ
+
+// To Check if it is running:
+//   ps aux | grep java
+
+// Check the running logs:
+//   journalctl -u guessasketch.service
+
+// Check the service logs:
+//   systemctl status guessasketch
+
+
 
 import com.google.gson.Gson
 import com.realityexpander.common.Constants.QUERY_PARAMETER_CLIENT_ID

@@ -55,9 +55,9 @@ class Room(
                 GamePhaseUpdate.GamePhase.NEW_ROUND -> newRoundPhase()
                 GamePhaseUpdate.GamePhase.ROUND_IN_PROGRESS -> roundInProgressPhase()
                 GamePhaseUpdate.GamePhase.ROUND_ENDED -> roundEndedPhase()
-                else -> {
-                    println("ERROR: setGamePhaseChangeListener - Unknown game phase: $newGamePhase")
-                }
+                // else -> {
+                //    println("ERROR: setGamePhaseChangeListener - Unknown game phase: $newGamePhase")
+                //}
             }
         }
     }
@@ -623,6 +623,7 @@ class Room(
             permanentlyRemovePlayer(removePlayer)
         } else {
             // Delayed removal of player (allows for reconnects within 60s)
+
 
             GlobalScope.launch {
                 // Tell all players that a player has been removed
