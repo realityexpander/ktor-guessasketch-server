@@ -53,6 +53,7 @@ class SketchServer {
         playersDB[newPlayer.clientId] = newPlayer
     }
 
+
     fun removePlayerFromServerDB(removeClientId: ClientId) {
         playersDB -= removeClientId
     }

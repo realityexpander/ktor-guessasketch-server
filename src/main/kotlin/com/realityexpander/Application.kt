@@ -44,6 +44,12 @@ package com.realityexpander
 // Set Environment Variables (instead of using .env file, also accessible from the heroku dashboard):
 // https://dashboard.heroku.com/apps/guess-a-sketch-server/settings
 //   heroku config:add PORT=8005  # this is the port that heroku will use to run your app
+//
+// In Android Studio, Update the `./data/remote/common.Constants.kt` file:
+//     USE_LOCALHOST=false
+//     REMOTE_HOST_TYPE="HEROKU"
+//     HTTP_BASE_URL_REMOTE_HEROKU = "https://<HEROKU_APP_NAME>.herokuapp.com:8005"
+//     WS_BASE_URL_REMOTE_HEROKU = "ws://<HEROKU_APP_NAME>.herokuapp.com:8005/ws/draw"
 
 // To deploy current version to heroku from master branch:
 //   git push heroku master:main
@@ -64,16 +70,32 @@ package com.realityexpander
 // 2. With terminal, cd into the `~/.ssh` folder.
 //    Generate a key pair:
 //   ssh-keygen -m PEM -t rsa -b 2048
+//    Give the kay a name, this is your <keyname>
 //
-// 3. Copy the public key to your server:
-//   ssh-copy-id -i <keyname>.pub root@<host>
+// 3. Copy the private key to your server:
+//   ssh-copy-id -i <keyname> root@<host>
+//    Enter password for the server.
 //
 // 4. In your IntelliJ project, create a folder called `keys` in the root folder,
 //    Add the `/keys` folder to your `.gitignore` file.
 //    Copy the private key <keyname> from the `~/.ssh` into this `keys` folder.
+//    NOTE: This is currently only used for the `ant.scp` and `ant.ssh` tasks.
 //
 // 5. Login to your Ubuntu server via SSH private key:
 //   ssh -i <keyname> root@<host>
+//
+//    To SSH into the server without long reference to `~/.ssh/hostinger_rsa`, do the following:
+//     nano ~/.ssh/config  # & Add these lines: (to allow ssh/scp/sftp to work without supplying password)
+//
+//     Host <shortcut-name>
+//       Host <server-ip-address>
+//       User root
+//       IdentityFile ~/.ssh/<private_keyname>
+//
+//     `^s to save`
+//     `^x to exit`
+//    Now you can SSH into the server without long reference to `~/.ssh/<keyname>`:
+//     ssh <shortcut-name>
 //
 // 6. Update dependencies:
 //   sudo apt update
@@ -138,8 +160,11 @@ package com.realityexpander
 //   HOST_SERVER_IP_ADDRESS=<HOST_SERVER_IP_ADDRESS>   # the IP address of the server you are connecting to
 //   HOST_SERVER_USERNAME=<HOST_SERVER_USERNAME>       # usually root
 //
-// 19. Update the `HTTP_BASE_URL_REMOTE` the data/remote/common.Constants.kt
-//     in Android Studio to your server's IP address, and set `USE_LOCALHOST` to false
+// 19. In Android Studio, Update the `./data/remote/common.Constants.kt` file:
+//     USE_LOCALHOST=false
+//     REMOTE_HOST_TYPE="UBUNTU"
+//     HTTP_BASE_URL_REMOTE_UBUNTU = "http://<HOST_SERVER_IP_ADDRESS>:8005"
+//     WS_BASE_URL_REMOTE_UBUNTU = "ws://<HOST_SERVER_IP_ADDRESS>:8005/ws/draw"
 //
 // 20. Run the `deployToUbuntu` task in IntelliJ
 
