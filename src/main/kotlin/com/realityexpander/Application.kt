@@ -70,9 +70,9 @@ package com.realityexpander
 // 2. With terminal, cd into the `~/.ssh` folder.
 //    Generate a key pair:
 //   ssh-keygen -m PEM -t rsa -b 2048
-//    Give the kay a name, this is your <keyname>
+//    Give the key a name, this is your <keyname>
 //
-// 3. Copy the private key to your server:
+// 3. Copy the PRIVATE key to your server:
 //   ssh-copy-id -i <keyname> root@<host>
 //    Enter password for the server.
 //
