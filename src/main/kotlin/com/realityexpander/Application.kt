@@ -223,12 +223,7 @@ fun Application.module() {
 
     install(WebSockets)
 
-    install(Routing) {
-        createRoomRoute()
-        getRoomsRoute()
-        joinRoomRoute()
-        gameWebSocketRoute()
-    }
+    configureRouting()
 
     install(CallLogging) {
         level = Level.INFO
