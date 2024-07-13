@@ -3,6 +3,8 @@ Ktor server for Guess-a-Sketch game
 
 Back end for the Android App in this repo: https://github.com/realityexpander/GuessASketch
 
+Running on Hostinger: https://hpanel.hostinger.com/ realityexpanderdev google
+
 ## Technologies employed:
 
 - Kotlin
